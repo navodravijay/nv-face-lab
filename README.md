@@ -1,10 +1,10 @@
-# NV. FACE LAB — Version 1
+# NV. FACE LAB — Version 2 / Phase 1 preview candidate
 
 A standalone, responsive computer-vision visual experiment for **NV SHARP SOLUTIONS**. Uses original HTML, CSS and JavaScript with Google's MediaPipe Tasks Vision SDK to render on-device face landmarks and heuristic hand-gesture-driven neon visual effects.
 
 ## Quick start
 
-1. Extract the ZIP and keep `index.html`, `styles.css`, `app.js`, `favicon.svg` and `_headers` together.
+1. Extract the ZIP and keep `index.html`, `styles.css`, `app.js`, `performance.mjs`, `favicon.svg` and `_headers` together.
 2. For local development, open a terminal in this directory and run `python -m http.server 8000` (or `npx serve .`), then visit `http://localhost:8000`.
 3. Read the consent notice, check the consent checkbox, then press **Start experience**. Your browser will request webcam permission.
 4. Hold up 0–5 fingers to change the neon palette. Five fingers also trigger a particle burst. Use **Stop camera** to release your webcam.
@@ -12,16 +12,25 @@ A standalone, responsive computer-vision visual experiment for **NV SHARP SOLUTI
 
 Do not open `index.html` using a `file://` URL. Camera access needs HTTPS or localhost.
 
-## GitHub → Cloudflare Pages deployment (recommended)
+## Existing GitHub → Cloudflare Pages deployment (preview-first)
 
-1. On GitHub, create a **new** repository named `nv-face-lab` under your account. Avoid changing the existing `nova-digital` repository.
-2. Extract this ZIP locally. In the new GitHub repository, choose **Add file → Upload files** and upload the extracted `index.html`, `styles.css`, `app.js`, `favicon.svg`, `_headers`, and `README.md` into the repository root (not a nested folder). Commit to `main`.
-3. In the [Cloudflare dashboard](https://dash.cloudflare.com/), open **Workers & Pages → Create application → Pages → Connect to Git** (wording may vary slightly). Select `nv-face-lab`, authorize access if asked, and begin setup.
-4. Recommended settings: **Production branch** `main`; **Framework preset** `None`; **Build command** blank (or `exit 0` if a value is required); **Build output directory** `.`; **Root directory** repository root.
-5. Deploy, open the generated `pages.dev` URL, and test the camera on HTTPS using real hardware.
-6. On later changes, push a commit to `main`; Cloudflare will automatically trigger a new production deployment. Never commit API keys, private user images, biometric data, or credentials.
+The production repo is **https://github.com/navodravijay/nv-face-lab** and its production site is **https://nv-face-lab.pages.dev/**. Do **not** create another repository or Cloudflare project, and do **not** upload this ZIP to `main` directly.
 
-> Upload the **individual extracted files** to GitHub. Uploading the `.zip` as one file will not publish the site. GitHub and Cloudflare deployment setup is not performed by this ZIP alone.
+1. Preserve the currently working `main` commit. Create a new GitHub branch named `feature/v2-premium-hybrid` from that commit.
+2. Upload the **extracted individual files** from this package into the new branch's repository root. File names and paths matter; `performance.mjs` must be beside `app.js`. For the repository's stray `download` file containing `.gitignore` entries, rename/delete it in the feature branch as appropriate and use `.gitignore` in the repository root.
+3. GitHub → Cloudflare Pages auto-deployment should create a **preview** for that branch if preview deployments are enabled. If no preview appears, review Cloudflare Pages → Settings → Builds & deployments / branch controls.
+4. On the HTTPS preview, verify actual camera start/stop, Face and Hand Landmarker functionality, consent, cross-browser behavior, console, privacy notices, performance, and response headers. See `RELEASE_CHECKLIST.md`.
+5. Only after passing checks, open a PR from `feature/v2-premium-hybrid` into `main`, review the diff, and merge. Cloudflare should automatically deploy the production branch. Verify the live site and retain the previous commit for rollback.
+
+> This archive is a **preview candidate**, not evidence of a tested production release. The code is built by merging Phase 1 changes onto the user's uploaded repository ZIP, which matched the previously provided V1 files for every tracked website asset (the only extra file was `download`, containing `.gitignore` rules). No GitHub push or Cloudflare deployment was performed here.
+
+## Phase 1 improvements and tests
+
+- Adaptive inference throttling between 50–180 ms based on synchronous detection duration.
+- Data-saver / low-core-count camera requests: ideal 640x480 at 24 fps, preserving normal desktop settings on faster hardware.
+- Camera-playback timeout and clearer errors for startup failures.
+- Readout renamed from FPS to **TRACK/S** to avoid confusing inference frequency with display frame rate.
+- Run `node --test tests/*.test.mjs`, `node --check app.js`, and `node --check performance.mjs` to check pure helpers, security invariants, and syntax.
 
 ## What is included
 
@@ -40,8 +49,8 @@ Do not open `index.html` using a `file://` URL. Camera access needs HTTPS or loc
 - The supplied CSP allows only the listed asset origins. The runtime's own metrics endpoint behavior is outside the scope of this standalone project; CSP may block some third-party metrics calls. Do not claim the SDK never transmits any network data.
 - Third-party CDN delivery is version-pinned but is not cryptographically integrity-locked here. For high-assurance deployment, review and self-host version-locked dependencies and models, verify asset hashes and licenses, then tighten `connect-src` and `script-src` to `'self'` after testing.
 - This visualization is **face tracking, not biometric identification**. It does not authenticate people, recognize identities or determine who they are. Do not market it as access control or identity verification.
-- Finger counting is approximate, dependent on lighting and hand angle, and is not a trained sign-language interpreter. UI frame-rate readings represent approximate completed inference cycles per second (not display FPS).
-- Safari, Chrome and Android/browser support varies. MediaPipe uses synchronous inference on the main thread here, which can cause jank on older devices. Consider a dedicated Worker for a production upgrade, but check WebGL/OffscreenCanvas support first.
+- Finger counting is approximate, dependent on lighting and hand angle, and is not a trained sign-language interpreter. UI `TRACK/S` readings represent approximate completed inference cycles per second (not display FPS).
+- Safari, Chrome and Android/browser support varies. MediaPipe uses synchronous inference on the main thread with adaptive throttling, which may still cause jank on older devices. A dedicated Worker may help in a later phase, but requires real-browser WebGL/OffscreenCanvas tests.
 - There is no formal penetration-test, compatibility test on physical cameras, or independent privacy audit. Do not claim this project is 100% secure.
 
 ## Security and performance checklist before client deployment

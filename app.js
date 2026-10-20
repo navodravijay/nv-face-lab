@@ -3,6 +3,8 @@
  * MediaPipe dependencies are version pinned and requested only after user consent.
  * No images/video or landmarks are persisted, uploaded, logged, or stored by this code.
  */
+import { calculateInferenceGap, getCameraConstraints } from "./performance.mjs";
+
 const MP_VERSION = "1.1.1";
 const MP_IMPORT = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const MP_WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
@@ -34,7 +36,7 @@ const state = {
   vision: null, faceTask: null, handTask: null, faceLandmarks: [], handLandmarks: [],
   faceConnections: [], faceOval: [], leftEye: [], rightEye: [], lips: [],
   handCount: 0, stableFingers: null, proposedFingers: null, proposedFrames: 0,
-  lastVideoTime: -1, lastInference: 0, fps: 0, lastFpsAt: 0,
+  lastVideoTime: -1, lastInference: 0, inferenceGapMs: 50, fps: 0, lastFpsAt: 0,
   fpsFrames: 0, color: colors[0], motionReduced: prefersLessMotion, meshEnabled: true,
   viewportW: 800, viewportH: 450, particles: [], ambience: [], frameId: 0, lastDrawAt: 0
 };
@@ -63,14 +65,14 @@ function setLoading(isLoading) {
 function resetReadouts() {
   state.faceLandmarks = []; state.handLandmarks = []; state.handCount = 0;
   state.stableFingers = null; state.proposedFingers = null; state.proposedFrames = 0;
-  state.lastVideoTime = -1; state.lastInference = 0; state.fps = 0;
+  state.lastVideoTime = -1; state.lastInference = 0; state.inferenceGapMs = 50; state.fps = 0;
   state.fpsFrames = 0; state.lastFpsAt = 0; state.particles.length = 0;
   state.color = colors[0];
   dom.faceCount.textContent = "—"; dom.handCount.textContent = "—";
   dom.gestureName.textContent = "AWAITING INPUT";
   dom.gestureDetail.textContent = "Show your hand to shift the scene.";
   dom.fingersValue.textContent = "— / 5"; dom.meterFill.style.width = "0%";
-  dom.stageFps.textContent = "-- FPS"; dom.coords.textContent = "X — / Y —";
+  dom.stageFps.textContent = "-- TRACK/S"; dom.coords.textContent = "X — / Y —";
 }
 
 async function initializeModels() {
@@ -127,8 +129,25 @@ function cameraErrorMessage(error) {
   }
 }
 
+async function beginVideoPlayback() {
+  // Some mobile browsers can leave video.play() unresolved after device changes.
+  // Always cancel the timeout even if video.play() rejects first.
+  let timeout;
+  try {
+    await Promise.race([
+      dom.video.play(),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("VideoStartTimeout")), 15000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function startCamera() {
   if (state.loading || state.running || !dom.consent.checked) return;
+  if (!ctx) { showError("Canvas rendering is not available in this browser. Try an updated Chrome, Edge, Firefox or Safari."); return; }
   hideError();
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     showError("Camera access requires HTTPS or localhost in a supported browser. Do not open the HTML directly using file://. See README for local preview steps.");
@@ -143,14 +162,17 @@ async function startCamera() {
   setLoading(true);
   try {
     // Request webcam only as a direct result of the user's Start action.
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia(getCameraConstraints({
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      saveData: navigator.connection?.saveData === true
+    }));
     if (generation !== state.generation) { stream.getTracks().forEach(t => t.stop()); return; }
     state.stream = stream;
     dom.video.srcObject = stream;
     stream.getVideoTracks()[0]?.addEventListener("ended", () => {
       if (generation === state.generation) stopCamera("The camera was disconnected or its permission changed.");
     }, { once: true });
-    await dom.video.play();
+    await beginVideoPlayback();
     dom.scanText.textContent = "INITIALIZING AI MODELS";
     await initializeModels();
     if (generation !== state.generation) return;
@@ -165,7 +187,11 @@ async function startCamera() {
   } catch (error) {
     if (generation !== state.generation) return;
     const cameraErrNames = new Set(["NotAllowedError", "PermissionDeniedError", "NotFoundError", "DevicesNotFoundError", "NotReadableError", "TrackStartError", "OverconstrainedError"]);
-    const message = cameraErrNames.has(error?.name) ? cameraErrorMessage(error) : "Vision engine could not initialize. Check your internet connection (required to load MediaPipe and its models) and try again.";
+    const message = cameraErrNames.has(error?.name)
+      ? cameraErrorMessage(error)
+      : error?.message === "VideoStartTimeout"
+        ? "The camera did not become ready in time. It has been stopped. Check whether another application is using it, then try again."
+        : "Vision engine could not initialize. Check your internet connection (required to load MediaPipe and its models) and try again.";
     stopCamera();
     showError(message);
     // Developer can inspect the original error locally, but avoid exposing private frame data.
@@ -218,9 +244,10 @@ function setGesture(next) {
 }
 function infer(frameTime) {
   if (!state.running || !state.faceTask || !state.handTask || dom.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
-  if (dom.video.currentTime === state.lastVideoTime || frameTime - state.lastInference < 50) return;
+  if (dom.video.currentTime === state.lastVideoTime || frameTime - state.lastInference < state.inferenceGapMs) return;
   state.lastVideoTime = dom.video.currentTime;
   state.lastInference = frameTime;
+  const inferenceStartedAt = performance.now();
   try {
     const faceResult = state.faceTask.detectForVideo(dom.video,frameTime);
     const handResult = state.handTask.detectForVideo(dom.video,frameTime);
@@ -250,13 +277,19 @@ function infer(frameTime) {
     if (frameTime - state.lastFpsAt > 950) {
       state.fps = Math.round(state.fpsFrames*1000/(frameTime-state.lastFpsAt));
       state.fpsFrames = 0; state.lastFpsAt = frameTime;
-      dom.stageFps.textContent = `${state.fps} FPS`;
+      dom.stageFps.textContent = `${state.fps} TRACK/S`;
     }
   } catch (error) {
     // Avoid endlessly using a broken media stream; leave a clear recoverable state.
     stopCamera();
     showError("Video tracking encountered an error. The camera has been stopped; you can try again.");
     console.warn("NV Face Lab tracking error:", error?.name || "Error");
+  } finally {
+    // Inference is synchronous. Reduce the inference rate on slower hardware to
+    // preserve room for UI rendering rather than piling up camera frame work.
+    if (state.running) {
+      state.inferenceGapMs = calculateInferenceGap(performance.now() - inferenceStartedAt, state.inferenceGapMs);
+    }
   }
 }
 
@@ -405,10 +438,13 @@ function draw(ms){
   drawBurst();
 }
 function tick(time){
-  // Video inference on main thread can be expensive; throttle to roughly 20Hz.
-  if(state.running && !document.hidden)infer(time);
-  const drawInterval=state.motionReduced?90:28;
-  if(time-state.lastDrawAt>=drawInterval){draw(time);state.lastDrawAt=time;}
+  // Video inference stays on the main thread in Phase 1; it is adaptively
+  // throttled. Workers are a separate tested Phase 2 migration.
+  if (!document.hidden) {
+    if (state.running) infer(time);
+    const drawInterval = state.motionReduced ? 90 : 28;
+    if (time - state.lastDrawAt >= drawInterval) { draw(time); state.lastDrawAt = time; }
+  }
   state.frameId=requestAnimationFrame(tick);
 }
 
@@ -422,6 +458,12 @@ dom.motion.addEventListener("change",()=>{state.motionReduced=dom.motion.checked
 if(prefersLessMotion) document.body.classList.add("reduce-motion");
 document.addEventListener("visibilitychange",()=>{if(document.hidden && (state.running||state.loading))stopCamera("Camera automatically stopped when the tab was hidden.");});
 window.addEventListener("pagehide",()=>stopCamera());
-window.addEventListener("resize",resizeCanvas,{passive:true});
-if(window.ResizeObserver){new ResizeObserver(resizeCanvas).observe(dom.stage);}
-resizeCanvas();requestAnimationFrame(tick);
+if (ctx) {
+  window.addEventListener("resize",resizeCanvas,{passive:true});
+  if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(dom.stage);
+  resizeCanvas();
+  requestAnimationFrame(tick);
+} else {
+  showError("NV. FACE LAB could not initialize its canvas. Try an updated browser.");
+  dom.start.disabled = true;
+}
