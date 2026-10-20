@@ -1,42 +1,29 @@
-# V2 Premium Hybrid — release checklist
+# V2.3 Preview-specific checks
 
-Use a Cloudflare **Preview deployment** from `feature/v2-premium-hybrid`, not production, for all testing until the criteria below pass. Complete the checklist with actual observations from the user's browser/devices.
+- [ ] GitHub upload was to `feature/v2-premium-hybrid` (NOT `main`).
+- [ ] Cloudflare Preview shows **one small neon accent at upper left of the camera stage**.
+- [ ] No decorative animated effects on the face or in other canvas corners.
+- [ ] If face moves into upper-left corner, ornament is safely clipped away.
+- [ ] Hand detection changes ornament COLOR only, never spawns a new animation.
+- [ ] Start, Stop, permission withdrawal, background tab behavior remain correct.
+- [ ] Preview mobile layout and no unexpected horizontal scrolling.
+- [ ] Reduced-motion preference freezes accent; live response/security headers checked.
 
-## Visual / functional
-- [ ] V2 `NV.` holo hero is visible on desktop; original monogram reads exactly `NV.`.
-- [ ] Developer credit says `Navod Ravindu Jayaweera` in Hero and Footer.
-- [ ] AUTO, CALM, ORBIT, WAVE, BLOOM, BURST buttons visibly change the canvas while camera is **off**.
-- [ ] Clicking a mode updates aria-pressed and live visual mode readout.
-- [ ] BURST creates a finite particle scatter animation; clicking BURST again restarts it.
-- [ ] Reduced motion suppresses burst animation and ambient animation as configured.
-- [ ] Performance and Cinematic quality choices change drawing load without UI errors.
-- [ ] Mobile 360px–430px viewport has no horizontal scrolling; stage and camera controls are legible.
-- [ ] Desktop remains usable on 1366px and 1920px viewports.
-- [ ] No important links, buttons or text hidden under overlays.
+---
 
-## Camera / gesture on real device
-- [ ] Camera is **not** requested merely by opening the website or clicking manual effect buttons.
-- [ ] Camera starts only after explicit consent and Start click; permission denial is recoverable.
-- [ ] Actual face mesh and the overlay align with the mirrored camera.
-- [ ] Hands are detected, and finger counts 0–5 select modes in AUTO (allow for heuristic errors).
-- [ ] Manual override works while the camera is running; switch back to AUTO restores gesture control.
-- [ ] Stop, tab hidden, permission revocation, and camera unplug release tracks and reset telemetry.
-- [ ] Camera starts again after Stop/Start where permissions allow.
-- [ ] Missing/slow network for MediaPipe is handled without leaving the camera active.
+# V2.2 Release Checklist — FACE SAFE ZONE
 
-## Security and privacy
-- [ ] `_headers` is present at the deployed root and live document response includes CSP, Permissions-Policy and X-Content-Type-Options.
-- [ ] Browser console has no script/CSP/asset errors (especially dynamic module + WASM loading).
-- [ ] Network tab shows no unexpected image/frame uploads or unrelated trackers. Review external MediaPipe traffic.
-- [ ] Dependencies pinned and licensing reviewed; no secrets or biometric recordings committed.
-- [ ] Check basic keyboard focus, screen-reader announcements, contrast, reduced motion, and accessibility.
-- [ ] Device CPU/GPU load, frame rate and battery impact acceptable on a mid-range phone.
-- [ ] Run and document automated tests, a Lighthouse/performance review, and relevant OWASP checks.
+**Never upload this package to `main` before branch Preview testing.**
 
-## Deploy
-- [ ] Confirm GitHub branch preview points to the latest V2 commit.
-- [ ] Submit a pull request; inspect diff before merge.
-- [ ] Merge only after preview tests pass and rollback commit is available.
-- [ ] Confirm `https://nv-face-lab.pages.dev/` resolves to new production commit and V2 controls work.
+1. Verify Preview deployment was triggered from `feature/v2-premium-hybrid`, not `main`.
+2. Open the page without camera. Switch through AUTO, CALM, ORBIT, WAVE, BLOOM, BURST. The idle face should have no light paths passing over its center.
+3. Start camera only after consent. Move face left/right and toward camera. Effects should disappear behind the protected rectangular face area, never cross eyes/nose/mouth; landmarks themselves remain visible.
+4. Switch Effect placement from FOCUSED / CLEAN to CINEMATIC / EDGE FX. Both must keep face unobstructed.
+5. Verify gesture stability controls (STEADY and RESPONSIVE) and camera stop / hidden-tab behavior.
+6. Verify mobile portrait orientation and narrow phone; if face fills frame, peripheral effects may be mostly hidden intentionally.
+7. Browser DevTools: no uncaught errors or blocked model loads; no uploads of video frames or face landmarks by app code; review external MediaPipe requests and Cloudflare security headers.
+8. Validate accessibility (keyboard controls and reduced-motion setting) and performance on actual devices.
+9. Verify brand `NV.`, #080d1b / #4d8dff / #4de0ff, developer Navod Ravindu Jayaweera, and Privacy Notice preserved.
+10. Merge from a Pull Request only after testing; protect `main` via GitHub branch ruleset when convenient.
 
-**Validation note:** Node static tests and a synthetic browser UI test are not substitutes for camera, external MediaPipe network, and live Cloudflare CSP testing.
+Automated tests cannot guarantee security, privacy, or camera behavior on user devices.

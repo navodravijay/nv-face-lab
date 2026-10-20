@@ -1,12 +1,52 @@
-# NV. FACE LAB — V2 Premium Hybrid Visual Engine
+# NV. FACE LAB — V2.3 Single Top-Left Orbit
+
+**Preview candidate; do not deploy to production without live webcam testing.**
+
+- Exactly **one small neon accent** is drawn in the **upper-left corner of the live camera stage**.
+- Removed four-corner animations, accent/wave/bloom/burst switching and moving environmental scanlines from the camera stage.
+- Removed the obsolete visual mode selector and effect placement selector. Hand detection remains, changing **only the accent color**.
+- Face and hand landmarks still track normally. Face-safe clipping masks the ornament if a face moves into the top-left area.
+- Privacy consent, stop camera, reduced motion, render quality, gesture responsiveness, branding and full developer name remain.
+- Styling outside the camera stage (e.g. website hero branding) is otherwise retained.
+- The existing MediaPipe CDN/model connections remain; no extra network dependencies were added.
+- Preview first using `feature/v2-premium-hybrid` branch. Verify face at upper left, camera start/stop, hand color changes, mobile and console, then promote only after test approval.
+
+---
+
+# NV. FACE LAB — V2.2 Clean Face Visual Layout
+
+**Earlier V2.2 release notes (historical reference).**
+
+V2.2 changes (on top of V2.1):
+
+- Default **Focused / Clean** mode: smaller, quieter animations anchored to four outer regions of the camera frame.
+- Optional **Cinematic / Edge FX**: stronger peripheral effects; still respects a face-safe exclusion rectangle.
+- The face safe area derives from current face landmarks with additional padding; when the camera is off it protects the center idle wireframe.
+- Environment scanlines, particle bursts and all visual effects are clipped outside that area.
+- Removed the animated nose/crosshair reticle; face mesh and hand landmarks remain.
+- No new CDN requests, third-party libraries, camera changes or storage.
+- If a face fills nearly the whole frame, effects may become faint/hidden, intentionally prioritizing face readability.
+- Test actual webcam motion, profile view, partially cropped faces and mobile portrait mode before merging.
+
+---
+
 
 **An original real-time face and hand landmark visualization experiment.**
 
 **Developer:** Navod Ravindu Jayaweera  
 **Studio:** NV SHARP SOLUTIONS  
 **Main website:** https://nv-sharp-solutions.pages.dev/  
-**Live production:** https://nv-face-lab.pages.dev/ (V1 until V2 is deliberately merged to production)  
+**Live production:** https://nv-face-lab.pages.dev/ (verify its current commit before release)  
 **GitHub:** https://github.com/navodravijay/nv-face-lab
+
+## What changed in V2.1 (relative to the V2 Visual Engine)
+
+- Improved AUTO gesture stability with **time-based hysteresis**, replacing the former fixed three-frame acceptance. Better tolerance of brief missed detections while face/hand inference rates vary.
+- **Gesture response** setting: Steady / Smooth (default; 220 ms gesture confirmation, 390 ms lost-hand grace) or Responsive / Fast (110 ms, 260 ms). It affects mode changes only, not camera capture or AI model inference.
+- Clear visible hand-signal feedback: stabilizing, confirmed, briefly lost, or no hand. Status stays local and is not stored.
+- Improved unit tests for gesture jitter, no-hand dropout, invalid input and performance-mode independence.
+- No new third-party dependencies, external requests or storage.
+- Tests alone are insufficient for production approval; validate actual camera behavior in Cloudflare Preview.
 
 ## What changed in V2
 
@@ -36,6 +76,7 @@ index.html        # Static interface and accessible controls
 styles.css        # Site design and responsive visual engine styles
 app.js            # Webcam, MediaPipe, Canvas and UI orchestration
 visual-engine.mjs # Tested, pure visual mode / quality helpers
+gesture-engine.mjs # Pure, tested frame-rate-independent gesture stabilizer
 performance.mjs   # Tested, pure inference gap and camera helpers
 favicon.svg
 _headers          # Cloudflare Pages response headers and CSP
@@ -64,7 +105,7 @@ The repo deliberately has no npm build step or package installation and should s
 
 ## GitHub → Cloudflare Pages preview workflow
 
-**Do not put this V2 release into `main` until the checklist passes.**
+**Do not upload this V2.1 update to `main` until the checklist passes.** The earlier V2 Visual Engine was already accidentally uploaded to production; this V2.1 package should go ONLY to `feature/v2-premium-hybrid` for testing.
 
 1. Open `https://github.com/navodravijay/nv-face-lab` and select branch `feature/v2-premium-hybrid`.
 2. Unzip the release locally; upload the files and folders **inside** the ZIP to the **repository root**. Replace existing files and commit, e.g., `Build V2 Premium Hybrid Visual Engine`.
