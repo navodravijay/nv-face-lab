@@ -140,3 +140,10 @@ html{overflow-x:clip}
 .face-safe-notice strong{font:800 9px Consolas,monospace;letter-spacing:.09em;color:#b8f5ff}
 .face-safe-notice small{font-size:10px;color:#94adca;line-height:1.5}
 @media(max-width:720px){.face-safe-notice{padding:11px 10px}.face-safe-notice small{font-size:9px}}
+
+/* NV. V2.3 — only one decorative animation in the live camera stage. */
+.stage-aurora{display:none!important;animation:none!important}
+#stage[data-mode="live"] .live-dot,#stage[data-mode="loading"] .live-dot{animation:none!important}
+.single-orbit-deck{padding-top:16px;padding-bottom:16px}
+.single-orbit-deck .mode-deck-heading{margin-bottom:8px}
+.single-orbit-deck .face-safe-notice{margin-top:0}

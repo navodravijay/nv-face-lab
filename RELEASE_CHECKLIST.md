@@ -1,3 +1,16 @@
+# V2.3 Preview-specific checks
+
+- [ ] GitHub upload was to `feature/v2-premium-hybrid` (NOT `main`).
+- [ ] Cloudflare Preview shows **one small neon orbit at upper left of the camera stage**.
+- [ ] No decorative animated effects on the face or in other canvas corners.
+- [ ] If face moves into upper-left corner, ornament is safely clipped away.
+- [ ] Hand detection changes ornament COLOR only, never spawns a new animation.
+- [ ] Start, Stop, permission withdrawal, background tab behavior remain correct.
+- [ ] Preview mobile layout and no unexpected horizontal scrolling.
+- [ ] Reduced-motion preference freezes orbit; live response/security headers checked.
+
+---
+
 # V2.2 Release Checklist — FACE SAFE ZONE
 
 **Never upload this package to `main` before branch Preview testing.**

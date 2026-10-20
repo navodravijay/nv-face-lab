@@ -35,14 +35,8 @@ export function outsideFace(rect, point) {
     point.y < rect.y || point.y > rect.y+rect.height;
 }
 
-/** Fixed edge anchors (not attached to the user's face). The camera moves, FX don't. */
+/** One fixed decorative ornament in the top-left of the stage. */
 export function peripheralAnchors(width, height) {
-  if (width <= 560) return [
-    {x:width*.13,y:height*.2},{x:width*.87,y:height*.2},
-    {x:width*.13,y:height*.78},{x:width*.87,y:height*.78}
-  ];
-  return [
-    {x:width*.13,y:height*.28},{x:width*.87,y:height*.28},
-    {x:width*.13,y:height*.77},{x:width*.87,y:height*.77}
-  ];
+  if (!(width > 0 && height > 0)) return [];
+  return [{x:width*(width <= 560 ? .16 : .135), y:height*(width <= 560 ? .21 : .24)}];
 }

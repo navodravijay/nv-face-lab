@@ -39,8 +39,8 @@
       <div class="hero-row">
         <div class="hero-copy">
           <h1 id="hero-title">REALITY<span class="comma">,</span><br><em>REWIRED.</em></h1>
-          <p>Your movement becomes a digital universe. Track your face, shape light around you with hand gestures, and switch between face-safe visual modes — entirely inside your browser.</p>
-          <div class="v2-hero-label"><span>01 / FACE MESH</span><span>02 / GESTURE FX</span><span>03 / LIVE ART</span></div>
+          <p>Your movement becomes a digital universe. Track your face, change the color of one small top-left orbit with hand gestures, and view a clean face mesh — entirely inside your browser.</p>
+          <div class="v2-hero-label"><span>01 / FACE MESH</span><span>02 / ORBIT ACCENT</span><span>03 / LIVE ART</span></div>
           <div class="hero-creator"><span class="creator-accent" aria-hidden="true"></span><span>DESIGNED &amp; DEVELOPED BY</span><strong>Navod Ravindu Jayaweera</strong></div>
         </div>
         <div class="hero-v2-card" aria-hidden="true">
@@ -74,7 +74,7 @@
             <div class="reticle reticle-bl" aria-hidden="true"></div>
             <div class="reticle reticle-br" aria-hidden="true"></div>
 
-            <div class="effect-readout overlay-noninteractive" aria-hidden="true"><span>ACTIVE VISUAL PROFILE</span><strong id="stage-mode-indicator">CALM / 00</strong><small id="stage-mode-caption">KINETIC LIGHT ENGINE</small></div>
+            <div class="effect-readout overlay-noninteractive" aria-hidden="true"><span>ACTIVE VISUAL PROFILE</span><strong id="stage-mode-indicator">ORBIT / 01</strong><small id="stage-mode-caption">TOP-LEFT ACCENT ONLY</small></div>
             <div class="stage-center-note" id="stage-note" aria-live="polite">
               <div class="note-icon"><span class="icon-iris"></span></div>
               <div class="note-kicker">LIVE COMPUTER VISION</div>
@@ -89,17 +89,9 @@
             </div>
           </div>
 
-          <div class="mode-deck" aria-label="Visual effect controls">
-            <div class="mode-deck-heading"><div><span class="mode-overline">VISUAL ENGINE / 02</span><strong>Shape the signal.</strong></div><span class="mode-deck-status" id="mode-help">AUTO follows your hand · or choose a look</span></div>
-            <div class="mode-options" role="group" aria-label="Select visual effects">
-              <button class="mode-option is-active" type="button" data-effect="auto" aria-pressed="true"><span class="mode-glyph">✦</span><span>AUTO</span></button>
-              <button class="mode-option" type="button" data-effect="calm" aria-pressed="false"><span class="mode-glyph">◯</span><span>CALM</span></button>
-              <button class="mode-option" type="button" data-effect="orbit" aria-pressed="false"><span class="mode-glyph">◎</span><span>ORBIT</span></button>
-              <button class="mode-option" type="button" data-effect="wave" aria-pressed="false"><span class="mode-glyph">≋</span><span>WAVE</span></button>
-              <button class="mode-option" type="button" data-effect="bloom" aria-pressed="false"><span class="mode-glyph">❋</span><span>BLOOM</span></button>
-              <button class="mode-option" type="button" data-effect="burst" aria-pressed="false"><span class="mode-glyph">✳</span><span>BURST</span></button>
-            </div>
-            <div class="face-safe-notice" aria-label="Face-safe effects enabled"><span aria-hidden="true">◉</span><div><strong>FACE SAFE ZONE / ACTIVE</strong><small>Light effects stay around your face, not across it.</small></div></div>
+          <div class="mode-deck single-orbit-deck" aria-label="Single corner animation">
+            <div class="mode-deck-heading"><div><span class="mode-overline">VISION ENGINE / 02</span><strong>One orbit. Clear face.</strong></div><span class="mode-deck-status" id="mode-help">One subtle orbit · face stays clear</span></div>
+            <div class="face-safe-notice" aria-label="Top-left face-safe effect enabled"><span aria-hidden="true">◉</span><div><strong>SINGLE ORBIT / TOP LEFT</strong><small>No decorative particle effects over your face. Hand gestures only change the orbit color.</small></div></div>
           </div>
           <div class="command-bar">
             <div class="command-copy">
@@ -132,19 +124,18 @@
             <span class="module-label">GESTURE RESPONSE <span>02 / INPUT</span></span>
             <div class="gesture-graphic" aria-hidden="true"><span class="finger f1"></span><span class="finger f2"></span><span class="finger f3"></span><span class="finger f4"></span><span class="finger f5"></span><span class="palm"></span></div>
             <strong id="gesture-name">AWAITING INPUT</strong>
-            <span id="gesture-detail">Show your hand to shift the scene.</span>
+            <span id="gesture-detail">Show your hand to change the single orbit color.</span>
             <div class="finger-meter"><span>FINGERS DETECTED</span><strong id="fingers-value">— / 5</strong></div>
             <div class="meter-track" aria-hidden="true"><span id="meter-fill"></span></div>
             <div class="gesture-signal" aria-label="Gesture signal status"><span class="signal-pip" aria-hidden="true"></span><span id="gesture-signal">AWAITING CAMERA INPUT</span></div>
           </div>
-          <div class="fx-state-panel"><span>VISUAL OUTPUT</span><strong id="visual-mode-label">CALM / 00</strong><small id="fx-driven">AUTO MODE · WAITING FOR INPUT</small></div>
+          <div class="fx-state-panel"><span>VISUAL OUTPUT</span><strong id="visual-mode-label">SINGLE ORBIT / TOP LEFT</strong><small id="fx-driven">ONE FIXED ORBIT · AWAITING HAND</small></div>
           <div class="visual-controls">
             <span class="module-label">DISPLAY SETTINGS <span>03 / OUTPUT</span></span>
             <label class="switch-row"><span><strong>Camera ghost</strong><small>Show live preview behind mesh</small></span><input type="checkbox" id="ghost-toggle" checked role="switch"><span class="switch-track" aria-hidden="true"></span></label>
             <label class="switch-row"><span><strong>Mesh connections</strong><small>Draw connected face geometry</small></span><input type="checkbox" id="mesh-toggle" checked role="switch"><span class="switch-track" aria-hidden="true"></span></label>
-            <label class="switch-row"><span><strong>Reduced motion</strong><small>Limit ambient animation</small></span><input type="checkbox" id="motion-toggle" role="switch"><span class="switch-track" aria-hidden="true"></span></label>
-            <label class="quality-row" for="sensitivity-select"><span><strong>Gesture response</strong><small>Steady avoids accidental mode changes</small></span><select id="sensitivity-select" aria-label="Gesture response sensitivity"><option value="steady">STEADY / SMOOTH</option><option value="responsive">RESPONSIVE / FAST</option></select></label>
-            <label class="quality-row" for="fx-placement-select"><span><strong>Effect placement</strong><small>Both settings keep the face clear</small></span><select id="fx-placement-select" aria-label="Effect placement"><option value="focused">FOCUSED / CLEAN</option><option value="cinematic">CINEMATIC / EDGE FX</option></select></label>
+            <label class="switch-row"><span><strong>Reduced motion</strong><small>Pause the single orbit motion</small></span><input type="checkbox" id="motion-toggle" role="switch"><span class="switch-track" aria-hidden="true"></span></label>
+            <label class="quality-row" for="sensitivity-select"><span><strong>Gesture response</strong><small>Steady avoids accidental color changes</small></span><select id="sensitivity-select" aria-label="Gesture response sensitivity"><option value="steady">STEADY / SMOOTH</option><option value="responsive">RESPONSIVE / FAST</option></select></label>
             <label class="quality-row" for="quality-select"><span><strong>Render quality</strong><small>Adaptive for your device</small></span><select id="quality-select" aria-label="Render quality"><option value="adaptive">AUTO / ADAPTIVE</option><option value="performance">PERFORMANCE</option><option value="cinematic">CINEMATIC</option></select></label>
           </div>
         </aside>
@@ -155,18 +146,18 @@
     <section class="v2-difference page-shell" aria-labelledby="difference-title">
       <div class="section-label"><span>02 /</span> THE VISION UPGRADE <div class="hairline"></div><span>WHAT'S NEW IN V2</span></div>
       <div class="v2-difference-layout">
-        <div><div class="v2-corner-tag">NV. / ENGINE 02</div><h2 id="difference-title">NOT JUST SEEN.<br><em>FELT.</em></h2><p>Five expressive visual behaviors and a manual creative deck. Switch looks without enabling your camera, or use AUTO to respond to your fingers in real time.</p></div>
-        <div class="difference-stats"><div><strong>05<span>+</span></strong><small>VISUAL STATES</small></div><div><strong>02</strong><small>TRACKING STREAMS</small></div><div><strong>00</strong><small>FRAMES STORED BY APP</small></div></div>
+        <div><div class="v2-corner-tag">NV. / ENGINE 02</div><h2 id="difference-title">NOT JUST SEEN.<br><em>FELT.</em></h2><p>One subtle orbital accent in the top-left corner, with a clear unobstructed face mesh. Hand gestures update the accent color without launching extra effects.</p></div>
+        <div class="difference-stats"><div><strong>01</strong><small>CORNER ORBIT</small></div><div><strong>02</strong><small>TRACKING STREAMS</small></div><div><strong>00</strong><small>FRAMES STORED BY APP</small></div></div>
       </div>
     </section>
 
     <section class="explainer page-shell" id="how-it-works" aria-labelledby="explainer-heading">
       <div class="section-label"><span>03 /</span> BEHIND THE SIGNAL <div class="hairline"></div><span>HOW IT WORKS</span></div>
-      <div class="explainer-header"><h2 id="explainer-heading">EVERY MOVEMENT<br><em>MEANS SOMETHING.</em></h2><p>Real-time landmarks become geometry. Your hand gestures transform peripheral light without covering your face.</p></div>
+      <div class="explainer-header"><h2 id="explainer-heading">EVERY MOVEMENT<br><em>MEANS SOMETHING.</em></h2><p>Real-time landmarks become geometry. Your hand gestures change the color of one small top-left ornament without covering your face.</p></div>
       <div class="feature-grid">
         <article class="feature-card"><span class="feature-number">01 —</span><div class="feature-art face-art" aria-hidden="true"><span class="face-ring"></span><span class="face-eye face-eye-left"></span><span class="face-eye face-eye-right"></span><span class="face-mouth"></span><span class="face-gridline face-gridline-a"></span><span class="face-gridline face-gridline-b"></span></div><h3>FACIAL GEOMETRY</h3><p>MediaPipe Face Landmarker maps hundreds of points across the face, rendered as a luminous, reactive wireframe.</p><span class="feature-tag">478 POINTS (MODEL-DEPENDENT)</span></article>
-        <article class="feature-card"><span class="feature-number">02 —</span><div class="feature-art hand-art" aria-hidden="true"><div class="hand-abstract"><i></i><i></i><i></i><i></i><i></i></div></div><h3>GESTURE CONTROL</h3><p>Show fingers to switch visual modes in AUTO. Switch to manual control whenever you want to explore without the camera.</p><span class="feature-tag">HEURISTIC FINGER COUNT</span></article>
-        <article class="feature-card"><span class="feature-number">03 —</span><div class="feature-art wave-art" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><h3>REACTIVE LIGHT</h3><p>Orbit rings, flowing waves, a luminous bloom and particle bursts animate outside a protected face zone with adaptive rendering.</p><span class="feature-tag">VISION ENGINE 02 · CANVAS 2D</span></article>
+        <article class="feature-card"><span class="feature-number">02 —</span><div class="feature-art hand-art" aria-hidden="true"><div class="hand-abstract"><i></i><i></i><i></i><i></i><i></i></div></div><h3>GESTURE CONTROL</h3><p>Show fingers to change the color of the fixed top-left orbit. No other special effects are drawn on the stage.</p><span class="feature-tag">HEURISTIC FINGER COUNT</span></article>
+        <article class="feature-card"><span class="feature-number">03 —</span><div class="feature-art wave-art" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><h3>REACTIVE LIGHT</h3><p>One small orbit stays in the top-left of the camera stage. The face remains clear, even when you move toward the corner.</p><span class="feature-tag">VISION ENGINE 02 · CANVAS 2D</span></article>
       </div>
     </section>
 

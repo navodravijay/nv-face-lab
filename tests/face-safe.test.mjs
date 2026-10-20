@@ -30,12 +30,12 @@ test('off-canvas landmarks never break safe zone clipping',()=>{
   const r=faceExclusionRect(pts,p=>p,300,240);
   assert(r.x>=0 && r.y>=0 && r.width>=0 && r.height>=0);
 });
-test('perimeter anchors do not follow face landmarks',()=>{
+test('the only ornament anchor is always in the upper left and does not follow the face',()=>{
   for(const [w,h] of [[390,440],[900,506]]){
     const anchors=peripheralAnchors(w,h);
-    assert.equal(anchors.length,4);
+    assert.equal(anchors.length,1);
     assert(anchors.every(a=>a.x>0&&a.x<w&&a.y>0&&a.y<h));
-    assert(anchors.every(a=>a.x<=w*.14 || a.x>=w*.86));
+    assert(anchors.every(a=>a.x<=w*.17 && a.y<=h*.25));
   }
 });
 test('FX are masked before drawing and true face landmarks render after clip restore',()=>{
@@ -45,11 +45,10 @@ test('FX are masked before drawing and true face landmarks render after clip res
   assert(draw.indexOf('ctx.restore()')<draw.indexOf('renderLandmarks(ms)'));
   assert(!app.includes('const src = accentCenter()'));
 });
-test('placement controls are explicit, accessible and both modes safe',()=>{
-  assert(html.includes('id="fx-placement-select"'));
-  assert(html.includes('FACE SAFE ZONE / ACTIVE'));
+test('one top-left ornament without the older placement UI',()=>{
+  assert(!html.includes('id="fx-placement-select"'));
+  assert(html.includes('SINGLE ORBIT / TOP LEFT'));
   assert(html.includes('Navod Ravindu Jayaweera'));
   assert(html.includes('NV. FACE LAB'));
-  assert(app.includes('FX_PLACEMENTS.includes(placement)'));
   assert(css.includes('#4de0ff'));
 });
