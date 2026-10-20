@@ -2,9 +2,9 @@
 
 **Preview candidate; do not deploy to production without live webcam testing.**
 
-- Exactly **one small neon orbit** is drawn in the **upper-left corner of the live camera stage**.
-- Removed four-corner animations, orbit/wave/bloom/burst switching and moving environmental scanlines from the camera stage.
-- Removed the obsolete visual mode selector and effect placement selector. Hand detection remains, changing **only the orbit color**.
+- Exactly **one small neon accent** is drawn in the **upper-left corner of the live camera stage**.
+- Removed four-corner animations, accent/wave/bloom/burst switching and moving environmental scanlines from the camera stage.
+- Removed the obsolete visual mode selector and effect placement selector. Hand detection remains, changing **only the accent color**.
 - Face and hand landmarks still track normally. Face-safe clipping masks the ornament if a face moves into the top-left area.
 - Privacy consent, stop camera, reduced motion, render quality, gesture responsiveness, branding and full developer name remain.
 - Styling outside the camera stage (e.g. website hero branding) is otherwise retained.
