@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080d1b">
+  <meta name="description" content="NV. FACE LAB — a privacy-conscious real-time computer vision experience. Explore live face mesh tracking, hand gestures and neon particle art.">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>NV. FACE LAB | Interactive Computer Vision</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="site-header page-shell">
+    <a class="brand" href="#home" aria-label="NV. FACE LAB — home">
+      <span class="brand-mark">NV<span>.</span></span>
+      <span class="brand-divider"></span>
+      <span class="brand-name">FACE <strong>LAB</strong><small>EXPERIMENT 001</small></span>
+    </a>
+    <nav class="top-nav" aria-label="Primary navigation">
+      <a href="#experience" class="nav-active">Experience</a>
+      <a href="#how-it-works">Technology</a>
+      <a href="#privacy">Privacy</a>
+    </nav>
+    <a class="header-link" href="https://nv-sharp-solutions.pages.dev/" target="_blank" rel="noopener noreferrer">
+      NV SHARP SOLUTIONS <span aria-hidden="true">↗</span>
+    </a>
+  </header>
+
+  <main id="home">
+    <section class="hero page-shell" aria-labelledby="hero-title">
+      <div class="eyebrow"><span class="eyebrow-pulse"></span> INTERACTIVE COMPUTER VISION / 001</div>
+      <div class="hero-row">
+        <div class="hero-copy">
+          <h1 id="hero-title">REALITY<span class="comma">,</span><br><em>REWIRED.</em></h1>
+          <p>Turn your movements into light. A live experiment in facial landmarks, hand gestures, and reactive digital art — powered by your own camera.</p>
+        </div>
+        <div class="hero-side">
+          <span class="side-slash" aria-hidden="true">/</span>
+          <div><strong>FACE × HAND × LIGHT</strong><span>YOUR MOTION. OUR CANVAS.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="experience page-shell" id="experience" aria-labelledby="experience-title">
+      <div class="section-label"><span>01 /</span> LIVE EXPERIENCE <div class="hairline"></div><span>INTERACTIVE PLAYGROUND</span></div>
+      <div class="lab-layout">
+        <div class="stage-area">
+          <div class="stage" id="stage" data-mode="idle">
+            <video id="camera" autoplay muted playsinline aria-label="Live camera preview; never recorded by this website"></video>
+            <div class="stage-gradient" aria-hidden="true"></div>
+            <div class="stage-grid" aria-hidden="true"></div>
+            <canvas id="vision-canvas" aria-label="Visualized face and hand landmarks" role="img"></canvas>
+            <div class="stage-top overlay-noninteractive">
+              <div class="live-status" id="live-status"><span class="live-dot"></span><span id="live-text">SYSTEM STANDBY</span></div>
+              <div class="stage-id">NV / VISION ENGINE <span>01</span></div>
+            </div>
+            <div class="reticle reticle-tl" aria-hidden="true"></div>
+            <div class="reticle reticle-tr" aria-hidden="true"></div>
+            <div class="reticle reticle-bl" aria-hidden="true"></div>
+            <div class="reticle reticle-br" aria-hidden="true"></div>
+
+            <div class="stage-center-note" id="stage-note" aria-live="polite">
+              <div class="note-icon"><span class="icon-iris"></span></div>
+              <div class="note-kicker">LIVE COMPUTER VISION</div>
+              <strong id="note-title">THE FUTURE IS LOOKING AT YOU.</strong>
+              <p id="note-description">Enable your camera to turn this abstract sculpture into a responsive face mesh.</p>
+            </div>
+
+            <div class="stage-bottom overlay-noninteractive">
+              <span id="stage-coordinate">X — / Y —</span>
+              <div class="scan-label"><span class="scan-bar"></span><span id="scan-text">AWAITING CAMERA INPUT</span></div>
+              <span class="stage-fps" id="stage-fps">-- FPS</span>
+            </div>
+          </div>
+
+          <div class="command-bar">
+            <div class="command-copy">
+              <span class="command-icon" aria-hidden="true">✳</span>
+              <div><strong>CONTROL THE EXPERIENCE</strong><span>Private by design · no video recording</span></div>
+            </div>
+            <div class="command-actions">
+              <button class="secondary-button" id="stop-btn" type="button" disabled><span aria-hidden="true">■</span> Stop camera</button>
+              <button class="primary-button" id="start-btn" type="button" disabled><span aria-hidden="true">◉</span> <span id="start-label">Start experience</span> <span aria-hidden="true">↗</span></button>
+            </div>
+          </div>
+          <div class="camera-notice" id="privacy-notice">
+            <label class="consent-label"><input id="consent" type="checkbox"><span class="custom-checkbox" aria-hidden="true"></span><span><strong>I understand and agree to start local camera processing.</strong> Camera access is requested only when I press Start. MediaPipe processes camera frames on this device; it may send usage/performance metrics to Google. Models and code are loaded from external servers. <a href="#privacy">Read privacy details</a>.</span></label>
+          </div>
+          <div class="error-message" id="error-message" role="alert" hidden></div>
+        </div>
+
+        <aside class="telemetry" aria-label="Live telemetry and controls">
+          <div class="panel-heading"><span>LIVE TELEMETRY</span><span class="panel-heading-icon">◈</span></div>
+          <div class="metric-top">
+            <div class="metric-label">TRACKING STATUS <span class="metric-led" id="tracking-led"></span></div>
+            <strong class="metric-main" id="tracking-state">OFFLINE</strong>
+            <span class="metric-sub" id="tracking-detail">READY WHEN YOU ARE</span>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-tile"><span>FACE POINTS</span><strong id="face-count">—</strong><small>LANDMARKS</small></div>
+            <div class="metric-tile"><span>HANDS</span><strong id="hand-count">—</strong><small>DETECTED</small></div>
+          </div>
+          <div class="gesture-module">
+            <span class="module-label">GESTURE RESPONSE <span>02 / INPUT</span></span>
+            <div class="gesture-graphic" aria-hidden="true"><span class="finger f1"></span><span class="finger f2"></span><span class="finger f3"></span><span class="finger f4"></span><span class="finger f5"></span><span class="palm"></span></div>
+            <strong id="gesture-name">AWAITING INPUT</strong>
+            <span id="gesture-detail">Show your hand to shift the scene.</span>
+            <div class="finger-meter"><span>FINGERS DETECTED</span><strong id="fingers-value">— / 5</strong></div>
+            <div class="meter-track" aria-hidden="true"><span id="meter-fill"></span></div>
+          </div>
+          <div class="visual-controls">
+            <span class="module-label">DISPLAY SETTINGS <span>03 / OUTPUT</span></span>
+            <label class="switch-row"><span><strong>Camera ghost</strong><small>Show live preview behind mesh</small></span><input type="checkbox" id="ghost-toggle" checked role="switch"><span class="switch-track" aria-hidden="true"></span></label>
+            <label class="switch-row"><span><strong>Mesh connections</strong><small>Draw connected face geometry</small></span><input type="checkbox" id="mesh-toggle" checked role="switch"><span class="switch-track" aria-hidden="true"></span></label>
+            <label class="switch-row"><span><strong>Reduced motion</strong><small>Limit ambient animation</small></span><input type="checkbox" id="motion-toggle" role="switch"><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+        </aside>
+      </div>
+      <div class="beneath-stage" aria-hidden="true"><span>EXPLORE THE UNSEEN</span><span>↓ SCROLL TO DECODE</span><span>DESIGNED IN SRI LANKA</span></div>
+    </section>
+
+    <section class="explainer page-shell" id="how-it-works" aria-labelledby="explainer-heading">
+      <div class="section-label"><span>02 /</span> BEHIND THE SIGNAL <div class="hairline"></div><span>HOW IT WORKS</span></div>
+      <div class="explainer-header"><h2 id="explainer-heading">EVERY MOVEMENT<br><em>MEANS SOMETHING.</em></h2><p>Real-time landmarks become geometry. Your hand gestures transform the energy of the entire scene.</p></div>
+      <div class="feature-grid">
+        <article class="feature-card"><span class="feature-number">01 —</span><div class="feature-art face-art" aria-hidden="true"><span class="face-ring"></span><span class="face-eye face-eye-left"></span><span class="face-eye face-eye-right"></span><span class="face-mouth"></span><span class="face-gridline face-gridline-a"></span><span class="face-gridline face-gridline-b"></span></div><h3>FACIAL GEOMETRY</h3><p>MediaPipe Face Landmarker maps hundreds of points across the face, rendered as a luminous, reactive wireframe.</p><span class="feature-tag">478 POINTS (MODEL-DEPENDENT)</span></article>
+        <article class="feature-card"><span class="feature-number">02 —</span><div class="feature-art hand-art" aria-hidden="true"><div class="hand-abstract"><i></i><i></i><i></i><i></i><i></i></div></div><h3>GESTURE CONTROL</h3><p>Hold up 0–5 fingers to shift color and energy. An open hand triggers a burst of scattered light.</p><span class="feature-tag">HEURISTIC FINGER COUNT</span></article>
+        <article class="feature-card"><span class="feature-number">03 —</span><div class="feature-art wave-art" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><h3>REACTIVE LIGHT</h3><p>Light trails, subtle glow and animated particles turn a simple camera feed into a digital art experiment.</p><span class="feature-tag">CANVAS 2D · JAVASCRIPT</span></article>
+      </div>
+    </section>
+
+    <section class="privacy-section page-shell" id="privacy" aria-labelledby="privacy-heading">
+      <div class="section-label"><span>03 /</span> THE TRUST LAYER <div class="hairline"></div><span>PRIVACY FIRST</span></div>
+      <div class="privacy-panel"><div><span class="privacy-eyebrow">YOUR CAMERA. YOUR CONTROL.</span><h2 id="privacy-heading">YOUR FACE ISN'T<br><em>OUR DATA.</em></h2><p>We do not implement account creation, image recording, biometric identification, frame uploads, or a database. Your camera frames are processed by MediaPipe in your browser for this visualization. Camera permission is requested only after your action; Stop releases the video tracks, and leaving the tab stops the camera.</p><p class="fine-print"><strong>External connections:</strong> This version downloads MediaPipe code from jsDelivr and AI models from Google storage. Google's MediaPipe documentation notes that usage and performance metrics may be sent to Google. No software can guarantee absolute privacy or security; review the dependencies and host configuration before production use.</p></div><div class="privacy-emblem" aria-hidden="true"><div class="emblem-ring a"></div><div class="emblem-ring b"></div><div class="emblem-ring c"></div><div class="emblem-center">NV<span>.</span></div></div></div>
+    </section>
+  </main>
+
+  <footer class="footer page-shell"><div class="footer-brand"><span>NV<span>.</span></span><div>FACE LAB <small>AN EXPERIMENT BY NV SHARP SOLUTIONS</small></div></div><span>BUILT FOR CURIOSITY. DESIGNED WITH CARE.</span><a href="https://nv-sharp-solutions.pages.dev/" target="_blank" rel="noopener noreferrer">BACK TO NV SHARP SOLUTIONS ↗</a></footer>
+  <div class="visually-hidden" id="announcements" role="status" aria-live="polite"></div>
+</body>
+</html>
