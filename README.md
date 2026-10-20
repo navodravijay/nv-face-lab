@@ -64,4 +64,6 @@ Do not open `index.html` using a `file://` URL. Camera access needs HTTPS or loc
 
 ## Attribution
 
+**Designed & Developed by Navod Ravindu Jayaweera** for NV SHARP SOLUTIONS.
+
 Original NV. FACE LAB app code and design. Powered by MediaPipe, a Google project distributed under its own terms. This project is **not** a copy of the `rukiya98/neon-face-scan` repository, nor does it represent any endorsement or affiliation with that repository.
