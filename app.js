@@ -80,7 +80,7 @@ function resetReadouts() {
   updateVisualMode();
   dom.faceCount.textContent = "—"; dom.handCount.textContent = "—";
   dom.gestureName.textContent = "AWAITING INPUT";
-  dom.gestureDetail.textContent = "Show your hand to change the subtle top-left accent color.";
+  dom.gestureDetail.textContent = "Show your hand to change the minimal top-left accent color.";
   dom.fingersValue.textContent = "— / 5"; dom.meterFill.style.width = "0%";
   dom.gestureSignal.textContent = "AWAITING CAMERA INPUT";
   dom.stageFps.textContent = "-- TRACK/S"; dom.coords.textContent = "X — / Y —";
@@ -246,7 +246,7 @@ function setGesture(next) {
   } else {
     state.color = colors[next];
     dom.gestureName.textContent = modes[next];
-    dom.gestureDetail.textContent = `${next} finger${next===1?"":"s"} visible · top-left accent color updated`;
+    dom.gestureDetail.textContent = `${next} finger${next===1?"":"s"} visible · minimal accent color updated`;
     dom.fingersValue.textContent = `${next} / 5`;
     dom.meterFill.style.width = `${next*20}%`;
 
@@ -396,11 +396,11 @@ function renderLandmarks(ms) {
 function updateVisualMode() {
   // Exactly one subtle decorative accent in the top-left of the live stage.
   // Hand gestures change its color, not its location or overall character.
-  dom.visualModeLabel.textContent = "SINGLE ACCENT / TOP LEFT";
-  dom.stageModeIndicator.textContent = "ACCENT / 01";
-  dom.stageModeCaption.textContent = "SUBTLE TOP-LEFT DETAIL";
-  dom.fxDriven.textContent = state.stableFingers == null ? "ONE FIXED ACCENT · AWAITING HAND" : `ONE FIXED ACCENT · ${state.stableFingers} FINGER(S)`;
-  dom.modeHelp.textContent = "One subtle accent · face stays clear";
+  dom.visualModeLabel.textContent = "MINIMAL ACCENT / TOP LEFT";
+  dom.stageModeIndicator.textContent = "MINIMAL / 01";
+  dom.stageModeCaption.textContent = "MINIMAL TOP-LEFT DETAIL";
+  dom.fxDriven.textContent = state.stableFingers == null ? "ONE MINIMAL ACCENT · AWAITING HAND" : `ONE MINIMAL ACCENT · ${state.stableFingers} FINGER(S)`;
+  dom.modeHelp.textContent = "One minimal accent · face stays clear";
 }
 
 function renderVisualFX(ms) {
@@ -418,23 +418,17 @@ function renderVisualFX(ms) {
   ctx.lineWidth=1.2;
   ctx.globalAlpha=.62*qualityFactor;
   // One subtle HUD-style accent. No orbit loops or large motion across the face.
-  const pulse = reduced ? 0.55 : 0.45 + 0.18 * Math.sin(t * 1.6);
-  const shimmer = reduced ? 0 : Math.sin(t * 2.2) * 2.2;
-  ctx.shadowColor=state.color;ctx.shadowBlur=reduced?0:10;
-  ctx.globalAlpha=(.84 + pulse*.08)*qualityFactor;
-  ctx.beginPath();ctx.arc(0,0,3.2,0,Math.PI*2);ctx.fill();
-  ctx.globalAlpha=(.32 + pulse*.12)*qualityFactor;
-  ctx.beginPath();ctx.arc(0,0,8.5,0,Math.PI*2);ctx.stroke();
-  ctx.globalAlpha=.70*qualityFactor;
-  ctx.beginPath();ctx.moveTo(7,-2);ctx.lineTo(23+shimmer, -2);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(-2,7);ctx.lineTo(-2,23+shimmer);ctx.stroke();
-  ctx.globalAlpha=.55*qualityFactor;
-  ctx.lineWidth=.8;
-  ctx.beginPath();ctx.moveTo(14,8);ctx.lineTo(18,12);ctx.lineTo(14,16);ctx.stroke();
-  ctx.globalAlpha=.48*qualityFactor;
-  ctx.fillRect(10, -15, 1.8, 1.8);
-  ctx.fillRect(15, -11, 1.8, 1.8);
-  ctx.fillRect(20, -15, 1.8, 1.8);
+  const pulse = reduced ? 0.5 : 0.42 + 0.10 * Math.sin(t * 1.35);
+  const drift = reduced ? 0 : Math.sin(t * 1.8) * 1.2;
+  ctx.shadowColor=state.color;ctx.shadowBlur=reduced?0:7;
+  ctx.globalAlpha=(.82 + pulse*.06)*qualityFactor;
+  ctx.beginPath();ctx.arc(0,0,2.2,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=(.22 + pulse*.10)*qualityFactor;
+  ctx.beginPath();ctx.arc(0,0,5.8,0,Math.PI*2);ctx.stroke();
+  ctx.globalAlpha=.52*qualityFactor;
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(6,-1);ctx.lineTo(16+drift,-1);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-1,6);ctx.lineTo(-1,16+drift);ctx.stroke();
   ctx.restore();
 }
 function draw(ms){
