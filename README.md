@@ -1,4 +1,20 @@
-# NV. FACE LAB — V2.1 Gesture Stability Update
+# NV. FACE LAB — V2.2 Clean Face Visual Layout
+
+**Current release candidate — preview only.**
+
+V2.2 changes (on top of V2.1):
+
+- Default **Focused / Clean** mode: smaller, quieter animations anchored to four outer regions of the camera frame.
+- Optional **Cinematic / Edge FX**: stronger peripheral effects; still respects a face-safe exclusion rectangle.
+- The face safe area derives from current face landmarks with additional padding; when the camera is off it protects the center idle wireframe.
+- Environment scanlines, particle bursts and all visual effects are clipped outside that area.
+- Removed the animated nose/crosshair reticle; face mesh and hand landmarks remain.
+- No new CDN requests, third-party libraries, camera changes or storage.
+- If a face fills nearly the whole frame, effects may become faint/hidden, intentionally prioritizing face readability.
+- Test actual webcam motion, profile view, partially cropped faces and mobile portrait mode before merging.
+
+---
+
 
 **An original real-time face and hand landmark visualization experiment.**
 

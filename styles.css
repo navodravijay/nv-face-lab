@@ -132,3 +132,11 @@ html{overflow-x:clip}
 /* V2.1: small but clearly legible, non-disruptive gesture signal feedback. */
 .gesture-signal{display:flex;align-items:center;gap:8px;margin-top:13px;color:#94b6d0;font:700 9px/1.5 Consolas,monospace;letter-spacing:.06em;min-height:17px}
 .signal-pip{display:inline-block;flex:none;width:6px;height:6px;border-radius:50%;background:#4de0ff;box-shadow:0 0 10px rgba(77,224,255,.38)}
+
+/* V2.2 FACE SAFE / spatially separated effects with unobtrusive controls */
+.face-safe-notice{display:flex;align-items:center;gap:12px;margin-top:13px;padding:12px 14px;border:1px solid rgba(77,224,255,.19);background:linear-gradient(95deg,rgba(77,224,255,.075),rgba(77,141,255,.025));color:#9ccfe2}
+.face-safe-notice>span{color:#4de0ff;font-size:17px;line-height:1}
+.face-safe-notice>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.face-safe-notice strong{font:800 9px Consolas,monospace;letter-spacing:.09em;color:#b8f5ff}
+.face-safe-notice small{font-size:10px;color:#94adca;line-height:1.5}
+@media(max-width:720px){.face-safe-notice{padding:11px 10px}.face-safe-notice small{font-size:9px}}

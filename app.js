@@ -6,6 +6,7 @@
 import { calculateInferenceGap, getCameraConstraints } from "./performance.mjs";
 import { VISUAL_MODES, SELECTABLE_MODES, modeForFingerCount, resolvedQuality, particleBudget, progressBetween } from "./visual-engine.mjs";
 import { createGestureStabilizer, SENSITIVITY_PRESETS } from "./gesture-engine.mjs";
+import { FX_PLACEMENTS, faceExclusionRect, peripheralAnchors } from "./face-safe.mjs";
 
 const MP_VERSION = "1.1.1";
 const MP_IMPORT = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -30,7 +31,7 @@ const dom = {
   modeButtons: Array.from(document.querySelectorAll("[data-effect]")),
   modeHelp: $("mode-help"), visualModeLabel: $("visual-mode-label"), fxDriven: $("fx-driven"),
   stageModeIndicator: $("stage-mode-indicator"), stageModeCaption: $("stage-mode-caption"),
-  qualitySelect: $("quality-select")
+  qualitySelect: $("quality-select"), fxPlacementSelect: $("fx-placement-select")
 };
 const ctx = dom.canvas.getContext("2d", { alpha: true });
 const prefersLessMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false;
@@ -48,7 +49,7 @@ const state = {
   fpsFrames: 0, color: colors[0], motionReduced: prefersLessMotion, meshEnabled: true,
   viewportW: 800, viewportH: 450, particles: [], ambience: [], frameId: 0, lastDrawAt: 0,
   manualMode: "auto", visualMode: "calm", previousVisualMode: "calm", modeChangedAt: -1000,
-  quality: "adaptive", renderQuality: resolvedQuality("adaptive", navigator.hardwareConcurrency, navigator.connection?.saveData === true)
+  fxPlacement: "focused", quality: "adaptive", renderQuality: resolvedQuality("adaptive", navigator.hardwareConcurrency, navigator.connection?.saveData === true)
 };
 
 function setStatus(mode, main, detail, scan) {
@@ -417,10 +418,7 @@ function renderLandmarks(ms) {
     ctx.shadowBlur=0;
     ctx.fillStyle="rgba(190,243,255,.69)";
     for(let i=0;i<face.length;i+=4){const p=projected(face[i]);ctx.beginPath();ctx.arc(p.x,p.y,1.0,0,Math.PI*2);ctx.fill();}
-    const p=projected(face[1]||face[0]);
-    ctx.save();ctx.strokeStyle="rgba(77,224,255,.4)";ctx.lineWidth=.8;
-    const r=20+(state.motionReduced?0:Math.sin(ms*.002)*4);
-    ctx.beginPath();ctx.moveTo(p.x-r,p.y);ctx.lineTo(p.x-9,p.y);ctx.moveTo(p.x+9,p.y);ctx.lineTo(p.x+r,p.y);ctx.moveTo(p.x,p.y-r);ctx.lineTo(p.x,p.y-9);ctx.moveTo(p.x,p.y+9);ctx.lineTo(p.x,p.y+r);ctx.stroke();ctx.restore();
+    // No animated reticle across eyes or nose. Keep the actual face mesh unobstructed.
   }
   if(hand.length){
     connectPoints(hand,handConnections,color,2.1);
@@ -428,14 +426,6 @@ function renderLandmarks(ms) {
     for(let i=0;i<hand.length;i++){const p=projected(hand[i]);ctx.beginPath();ctx.arc(p.x,p.y,[4,8,12,16,20].includes(i)?3.3:2,0,Math.PI*2);ctx.fill();}
     ctx.restore();
   }
-}
-function accentCenter() {
-  if (state.faceLandmarks.length) return projected(state.faceLandmarks[1] || state.faceLandmarks[0]);
-  return {x:state.viewportW*.5, y:state.viewportH*.45};
-}
-function handAnchor() {
-  if (state.handLandmarks.length) return projected(state.handLandmarks[9]);
-  return null;
 }
 function updateVisualMode() {
   const next = state.manualMode === "auto" ? modeForFingerCount(state.stableFingers) : state.manualMode;
@@ -469,14 +459,15 @@ function setManualMode(mode) {
   announce(`${mode === "auto" ? "Automatic gesture effects enabled" : `${VISUAL_MODES[mode].label} visual preview selected`}. ${state.running ? "Camera remains active." : "Camera is off."}`);
 }
 function spawnBurst() {
-  if(state.motionReduced) return;
-  const src = accentCenter();
+  if (state.motionReduced) return;
+  const anchors=peripheralAnchors(state.viewportW,state.viewportH);
   const budget = particleBudget(state.renderQuality, state.motionReduced);
   state.particles = [];
   for(let i=0;i<budget;i++){
+    const source=anchors[i%anchors.length];
     const ang=(i*2.399963229728653)%6.283;
-    const sp=1.35+(i%13)*.33;
-    state.particles.push({x:src.x+(i%9-4)*2,y:src.y+(i%5-2)*2,
+    const sp=.9+(i%13)*.23;
+    state.particles.push({x:source.x+(i%5-2)*2,y:source.y+(i%7-3)*2,
       vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:1,size:.85+(i%4)*.6});
   }
 }
@@ -490,71 +481,72 @@ function drawBurst() {
   }
   ctx.restore();state.particles=state.particles.filter(p=>p.life>0);
 }
+/** Every effect is anchored to the frame's outer edge, never to a facial landmark. */
 function drawEffect(ms, mode, alpha=1) {
-  const center=accentCenter(), hand=handAnchor();
-  const t=state.motionReduced?0:ms*.001;
-  const s=Math.min(state.viewportW,state.viewportH);
-  const intensity=state.renderQuality==="performance"?.7:1;
-  ctx.save();ctx.translate(center.x,center.y);ctx.globalAlpha*=alpha;
-  ctx.strokeStyle=state.color;ctx.fillStyle=state.color;
-  ctx.lineCap="round";
-  if(mode==="calm") {
-    const r=s*.19;
-    ctx.globalAlpha*=.34;
-    ctx.lineWidth=1;
-    for(let k=0;k<3;k++) {
-      const rr=r*(.8+k*.24)+(state.motionReduced?0:Math.sin(t*.65+k)*3);
-      ctx.beginPath();ctx.ellipse(0,0,rr,rr*1.2,0,0,Math.PI*2);ctx.stroke();
-    }
-  } else if(mode==="orbit") {
-    const radius=s*.225;
-    for(let ring=0;ring<3;ring++) {
-      const a=t*(ring%2===0?.28:-.22)+ring*1.047;
-      ctx.save();ctx.rotate(a);ctx.lineWidth=ring===0?1.6:.9;ctx.globalAlpha*=ring===0?.72:.42;
-      ctx.beginPath();ctx.ellipse(0,0,radius*(.9+ring*.14),radius*.44,Math.PI/6,0,Math.PI*2);ctx.stroke();
-      for(let j=0;j<(state.renderQuality==="performance"?6:13);j++){
-        const theta=j/(state.renderQuality==="performance"?6:13)*Math.PI*2+t*.5;
-        const x=Math.cos(theta)*radius*(.9+ring*.14),y=Math.sin(theta)*radius*.44;
-        ctx.beginPath();ctx.arc(x,y,j%4===0?2.5:1.2,0,Math.PI*2);ctx.fill();
+  const w=state.viewportW, h=state.viewportH;
+  const anchors=peripheralAnchors(w,h);
+  const t=state.motionReduced ? 0 : ms*.001;
+  const cinematic=state.fxPlacement === "cinematic";
+  const energy=(cinematic ? 1 : .59)*(state.renderQuality === "performance" ? .72 : 1);
+  const unit=Math.min(w,h)*(cinematic ? .145 : .105);
+  ctx.save();
+  ctx.strokeStyle=state.color;ctx.fillStyle=state.color;ctx.lineCap="round";
+  for(let a=0;a<anchors.length;a++){
+    const anchor=anchors[a];
+    ctx.save();ctx.translate(anchor.x,anchor.y);ctx.globalAlpha*=alpha*energy;
+    if(mode==="calm"){
+      ctx.lineWidth=1;
+      for(let k=0;k<2;k++){
+        const radius=unit*(.48+k*.32)+(state.motionReduced?0:Math.sin(t*.6+a+k)*2);
+        ctx.globalAlpha=alpha*energy*(.17+k*.09);
+        ctx.beginPath();ctx.arc(0,0,radius,0,Math.PI*2);ctx.stroke();
       }
-      ctx.restore();
-    }
-  } else if(mode==="wave") {
-    const w=state.viewportW*.61;
-    const amplitude=s*.055*(hand?1.3:1);
-    const bands=state.renderQuality==="performance"?4:7;
-    for(let k=0;k<bands;k++) {
-      ctx.globalAlpha=alpha*(.11+k*.062)*intensity;
-      ctx.lineWidth=k%3===0?1.8:.9;
-      ctx.beginPath();
-      for(let i=0;i<=55;i++){
-        const x=-w/2+(i/55)*w;
-        const y=(k-(bands-1)/2)*12+Math.sin((i/55)*Math.PI*4.5-t*1.5+k*.53)*amplitude;
-        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    } else if(mode==="orbit"){
+      for(let ring=0;ring<2;ring++){
+        ctx.save();ctx.rotate(t*(a%2===0?.19:-.17)+a*.7+ring*.9);
+        ctx.globalAlpha=alpha*energy*(ring===0?.55:.3);
+        ctx.lineWidth=ring===0?1.5:.8;
+        const radius=unit*(1+ring*.4);
+        ctx.beginPath();ctx.ellipse(0,0,radius,radius*.56,Math.PI/7,0,Math.PI*2);ctx.stroke();
+        for(let i=0;i<6;i++){
+          const theta=i*Math.PI/3+t*.33;
+          ctx.beginPath();ctx.arc(Math.cos(theta)*radius,Math.sin(theta)*radius*.56,1.7,0,Math.PI*2);ctx.fill();
+        }
+        ctx.restore();
       }
-      ctx.stroke();
+    } else if(mode==="wave"){
+      const waves=state.renderQuality === "performance" ? 3 : 5;
+      for(let j=0;j<waves;j++){
+        ctx.globalAlpha=alpha*energy*(.16+j*.08);ctx.lineWidth=j%2?1:1.5;
+        ctx.beginPath();
+        for(let i=0;i<=35;i++){
+          const yy=unit*(i/35*2-1);
+          const xx=(j-(waves-1)/2)*6+Math.sin(i*.25-t*1.35+a+j*.5)*unit*.25;
+          if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);
+        }
+        ctx.stroke();
+      }
+    } else if(mode==="bloom"){
+      const petals=state.renderQuality === "performance" ? 5 : 8;
+      for(let i=0;i<petals;i++){
+        ctx.save();ctx.rotate(i*Math.PI*2/petals+t*.07);
+        ctx.globalAlpha=alpha*energy*(.2+(i%3)*.07);ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(0,0);
+        ctx.bezierCurveTo(unit*.38,-unit*.45,unit*1.2,-unit*.25,unit*1.3,0);
+        ctx.bezierCurveTo(unit*1.2,unit*.25,unit*.38,unit*.45,0,0);ctx.stroke();
+        ctx.restore();
+      }
+    } else if(mode==="burst"){
+      const rays=state.renderQuality === "performance" ? 9 : 16;
+      for(let i=0;i<rays;i++){
+        const angle=i*Math.PI*2/rays+(state.motionReduced?0:t*.13);
+        const r=unit*(.7+(i%4)*.15);
+        ctx.globalAlpha=alpha*energy*(.22+(i%4)*.09);ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(Math.cos(angle)*r*.56,Math.sin(angle)*r*.56);
+        ctx.lineTo(Math.cos(angle)*r,Math.sin(angle)*r);ctx.stroke();
+      }
     }
-  } else if(mode==="bloom") {
-    const petals=state.renderQuality==="performance"?8:12;
-    const base=s*.115+(state.motionReduced?0:Math.sin(t*1.4)*6);
-    for(let i=0;i<petals;i++) {
-      ctx.save();ctx.rotate(i*2*Math.PI/petals+t*.07);
-      ctx.globalAlpha=alpha*(.22+(i%3)*.065)*intensity;ctx.lineWidth=i%2===0?1.4:.8;
-      ctx.beginPath();ctx.moveTo(0,0);
-      ctx.bezierCurveTo(base*.95,-base*.47,base*2,-base*.18,base*1.6,0);
-      ctx.bezierCurveTo(base*2,base*.18,base*.95,base*.47,0,0);ctx.stroke();
-      ctx.restore();
-    }
-  } else if(mode==="burst") {
-    const count=state.renderQuality==="performance"?18:34;
-    const phase=t*.25;
-    for(let i=0;i<count;i++){
-      const a=i*Math.PI*2/count+phase;
-      const r=s*(.20+(i%5)*.013);
-      ctx.globalAlpha=alpha*(.22+(i%4)*.11);
-      ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.65,Math.sin(a)*r*.65);
-      ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);ctx.stroke();
-    }
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -569,11 +561,19 @@ function draw(ms){
   if(!ctx)return;
   resizeCanvas();const {viewportW:w,viewportH:h}=state;
   ctx.clearRect(0,0,w,h);
+  // Even fast face movements cannot cause animated FX to cover the detected face.
+  // Strict rectangular exclusion keeps every line, pixel, glow and particle outside
+  // a padded face bounding box. When camera is off, protect the idle face sculpture.
+  const safe=faceExclusionRect(state.faceLandmarks,projected,w,h,state.fxPlacement);
+  ctx.save();
+  ctx.beginPath();ctx.rect(0,0,w,h);ctx.rect(safe.x,safe.y,safe.width,safe.height);
+  ctx.clip("evenodd");
   drawEnvironment(ms);
-  if(!state.running) drawIdle(ms);
   renderVisualFX(ms);
-  if(state.running && (state.faceLandmarks.length||state.handLandmarks.length)) renderLandmarks(ms);
   drawBurst();
+  ctx.restore();
+  if(!state.running) drawIdle(ms);
+  if(state.running && (state.faceLandmarks.length||state.handLandmarks.length)) renderLandmarks(ms);
 }
 function tick(time){
   // Video inference stays on the main thread in Phase 1; it is adaptively
@@ -599,6 +599,13 @@ dom.sensitivitySelect.addEventListener("change", () => {
   setGesture(null);
   dom.gestureSignal.textContent = state.running ? "READY FOR NEXT GESTURE" : "AWAITING CAMERA INPUT";
   announce(`Gesture response set to ${preset}. ${preset === "steady" ? "Holds gestures longer to reduce flicker." : "Switches modes faster."}`);
+});
+dom.fxPlacementSelect.addEventListener("change", () => {
+  const placement=dom.fxPlacementSelect.value;
+  if (!FX_PLACEMENTS.includes(placement)) return;
+  state.fxPlacement=placement;
+  // Both styles always respect a padding zone around the face.
+  announce(placement === "focused" ? "Focused mode: subtle lights at the edges, face stays clear." : "Cinematic edge effects enabled. The face stays protected.");
 });
 dom.qualitySelect.addEventListener("change", () => {
   state.quality = dom.qualitySelect.value;
