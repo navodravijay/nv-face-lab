@@ -7,7 +7,7 @@
   <meta name="description" content="NV. FACE LAB — a privacy-conscious real-time computer vision experience. Explore live face mesh tracking, hand gestures and neon particle art.">
   <meta name="author" content="Navod Ravindu Jayaweera">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>NV. FACE LAB | Interactive Computer Vision</title>
+  <title>NV. FACE LAB | Vision Engine 02 — Interactive Computer Vision</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
@@ -21,7 +21,7 @@
     <a class="brand" href="#home" aria-label="NV. FACE LAB — home">
       <span class="brand-mark">NV<span>.</span></span>
       <span class="brand-divider"></span>
-      <span class="brand-name">FACE <strong>LAB</strong><small>EXPERIMENT 002</small></span>
+      <span class="brand-name">FACE <strong>LAB</strong><small>VISION ENGINE 02</small></span>
     </a>
     <nav class="top-nav" aria-label="Primary navigation">
       <a href="#experience" class="nav-active">Experience</a>
@@ -39,12 +39,18 @@
       <div class="hero-row">
         <div class="hero-copy">
           <h1 id="hero-title">REALITY<span class="comma">,</span><br><em>REWIRED.</em></h1>
-          <p>Turn your movements into light. A live experiment in facial landmarks, hand gestures, and reactive digital art — powered by your own camera.</p>
+          <p>Your movement becomes a digital universe. Track your face, shape light with hand gestures, and switch between living visual modes — entirely inside your browser.</p>
+          <div class="v2-hero-label"><span>01 / FACE MESH</span><span>02 / GESTURE FX</span><span>03 / LIVE ART</span></div>
           <div class="hero-creator"><span class="creator-accent" aria-hidden="true"></span><span>DESIGNED &amp; DEVELOPED BY</span><strong>Navod Ravindu Jayaweera</strong></div>
         </div>
-        <div class="hero-side">
-          <span class="side-slash" aria-hidden="true">/</span>
-          <div><strong>FACE × HAND × LIGHT</strong><span>YOUR MOTION. OUR CANVAS.</span></div>
+        <div class="hero-v2-card" aria-hidden="true">
+          <div class="hero-orb-shell">
+            <div class="hero-orb-grid"></div>
+            <div class="hero-orb-ring ring-1"></div><div class="hero-orb-ring ring-2"></div><div class="hero-orb-ring ring-3"></div>
+            <div class="hero-orb-core">NV<span>.</span></div>
+            <span class="orb-dot dot-a"></span><span class="orb-dot dot-b"></span><span class="orb-dot dot-c"></span>
+          </div>
+          <div class="hero-orb-foot"><span><i></i> VISION SYSTEM / ONLINE</span><strong>02 <small>/ PREMIUM HYBRID</small></strong></div>
         </div>
       </div>
     </section>
@@ -57,6 +63,7 @@
             <video id="camera" autoplay muted playsinline aria-label="Live camera preview; never recorded by this website"></video>
             <div class="stage-gradient" aria-hidden="true"></div>
             <div class="stage-grid" aria-hidden="true"></div>
+            <div class="stage-aurora" aria-hidden="true"></div>
             <canvas id="vision-canvas" aria-label="Visualized face and hand landmarks" role="img"></canvas>
             <div class="stage-top overlay-noninteractive">
               <div class="live-status" id="live-status"><span class="live-dot"></span><span id="live-text">SYSTEM STANDBY</span></div>
@@ -67,6 +74,7 @@
             <div class="reticle reticle-bl" aria-hidden="true"></div>
             <div class="reticle reticle-br" aria-hidden="true"></div>
 
+            <div class="effect-readout overlay-noninteractive" aria-hidden="true"><span>ACTIVE VISUAL PROFILE</span><strong id="stage-mode-indicator">CALM / 00</strong><small id="stage-mode-caption">KINETIC LIGHT ENGINE</small></div>
             <div class="stage-center-note" id="stage-note" aria-live="polite">
               <div class="note-icon"><span class="icon-iris"></span></div>
               <div class="note-kicker">LIVE COMPUTER VISION</div>
@@ -81,6 +89,17 @@
             </div>
           </div>
 
+          <div class="mode-deck" aria-label="Visual effect controls">
+            <div class="mode-deck-heading"><div><span class="mode-overline">VISUAL ENGINE / 02</span><strong>Shape the signal.</strong></div><span class="mode-deck-status" id="mode-help">AUTO follows your hand · or choose a look</span></div>
+            <div class="mode-options" role="group" aria-label="Select visual effects">
+              <button class="mode-option is-active" type="button" data-effect="auto" aria-pressed="true"><span class="mode-glyph">✦</span><span>AUTO</span></button>
+              <button class="mode-option" type="button" data-effect="calm" aria-pressed="false"><span class="mode-glyph">◯</span><span>CALM</span></button>
+              <button class="mode-option" type="button" data-effect="orbit" aria-pressed="false"><span class="mode-glyph">◎</span><span>ORBIT</span></button>
+              <button class="mode-option" type="button" data-effect="wave" aria-pressed="false"><span class="mode-glyph">≋</span><span>WAVE</span></button>
+              <button class="mode-option" type="button" data-effect="bloom" aria-pressed="false"><span class="mode-glyph">❋</span><span>BLOOM</span></button>
+              <button class="mode-option" type="button" data-effect="burst" aria-pressed="false"><span class="mode-glyph">✳</span><span>BURST</span></button>
+            </div>
+          </div>
           <div class="command-bar">
             <div class="command-copy">
               <span class="command-icon" aria-hidden="true">✳</span>
@@ -115,31 +134,43 @@
             <span id="gesture-detail">Show your hand to shift the scene.</span>
             <div class="finger-meter"><span>FINGERS DETECTED</span><strong id="fingers-value">— / 5</strong></div>
             <div class="meter-track" aria-hidden="true"><span id="meter-fill"></span></div>
+            <div class="gesture-signal" aria-label="Gesture signal status"><span class="signal-pip" aria-hidden="true"></span><span id="gesture-signal">AWAITING CAMERA INPUT</span></div>
           </div>
+          <div class="fx-state-panel"><span>VISUAL OUTPUT</span><strong id="visual-mode-label">CALM / 00</strong><small id="fx-driven">AUTO MODE · WAITING FOR INPUT</small></div>
           <div class="visual-controls">
             <span class="module-label">DISPLAY SETTINGS <span>03 / OUTPUT</span></span>
             <label class="switch-row"><span><strong>Camera ghost</strong><small>Show live preview behind mesh</small></span><input type="checkbox" id="ghost-toggle" checked role="switch"><span class="switch-track" aria-hidden="true"></span></label>
             <label class="switch-row"><span><strong>Mesh connections</strong><small>Draw connected face geometry</small></span><input type="checkbox" id="mesh-toggle" checked role="switch"><span class="switch-track" aria-hidden="true"></span></label>
             <label class="switch-row"><span><strong>Reduced motion</strong><small>Limit ambient animation</small></span><input type="checkbox" id="motion-toggle" role="switch"><span class="switch-track" aria-hidden="true"></span></label>
+            <label class="quality-row" for="sensitivity-select"><span><strong>Gesture response</strong><small>Steady avoids accidental mode changes</small></span><select id="sensitivity-select" aria-label="Gesture response sensitivity"><option value="steady">STEADY / SMOOTH</option><option value="responsive">RESPONSIVE / FAST</option></select></label>
+            <label class="quality-row" for="quality-select"><span><strong>Render quality</strong><small>Adaptive for your device</small></span><select id="quality-select" aria-label="Render quality"><option value="adaptive">AUTO / ADAPTIVE</option><option value="performance">PERFORMANCE</option><option value="cinematic">CINEMATIC</option></select></label>
           </div>
         </aside>
       </div>
       <div class="beneath-stage" aria-hidden="true"><span>EXPLORE THE UNSEEN</span><span>↓ SCROLL TO DECODE</span><span>DESIGNED IN SRI LANKA</span></div>
     </section>
 
+    <section class="v2-difference page-shell" aria-labelledby="difference-title">
+      <div class="section-label"><span>02 /</span> THE VISION UPGRADE <div class="hairline"></div><span>WHAT'S NEW IN V2</span></div>
+      <div class="v2-difference-layout">
+        <div><div class="v2-corner-tag">NV. / ENGINE 02</div><h2 id="difference-title">NOT JUST SEEN.<br><em>FELT.</em></h2><p>Five expressive visual behaviors and a manual creative deck. Switch looks without enabling your camera, or use AUTO to respond to your fingers in real time.</p></div>
+        <div class="difference-stats"><div><strong>05<span>+</span></strong><small>VISUAL STATES</small></div><div><strong>02</strong><small>TRACKING STREAMS</small></div><div><strong>00</strong><small>FRAMES STORED BY APP</small></div></div>
+      </div>
+    </section>
+
     <section class="explainer page-shell" id="how-it-works" aria-labelledby="explainer-heading">
-      <div class="section-label"><span>02 /</span> BEHIND THE SIGNAL <div class="hairline"></div><span>HOW IT WORKS</span></div>
+      <div class="section-label"><span>03 /</span> BEHIND THE SIGNAL <div class="hairline"></div><span>HOW IT WORKS</span></div>
       <div class="explainer-header"><h2 id="explainer-heading">EVERY MOVEMENT<br><em>MEANS SOMETHING.</em></h2><p>Real-time landmarks become geometry. Your hand gestures transform the energy of the entire scene.</p></div>
       <div class="feature-grid">
         <article class="feature-card"><span class="feature-number">01 —</span><div class="feature-art face-art" aria-hidden="true"><span class="face-ring"></span><span class="face-eye face-eye-left"></span><span class="face-eye face-eye-right"></span><span class="face-mouth"></span><span class="face-gridline face-gridline-a"></span><span class="face-gridline face-gridline-b"></span></div><h3>FACIAL GEOMETRY</h3><p>MediaPipe Face Landmarker maps hundreds of points across the face, rendered as a luminous, reactive wireframe.</p><span class="feature-tag">478 POINTS (MODEL-DEPENDENT)</span></article>
-        <article class="feature-card"><span class="feature-number">02 —</span><div class="feature-art hand-art" aria-hidden="true"><div class="hand-abstract"><i></i><i></i><i></i><i></i><i></i></div></div><h3>GESTURE CONTROL</h3><p>Hold up 0–5 fingers to shift color and energy. An open hand triggers a burst of scattered light.</p><span class="feature-tag">HEURISTIC FINGER COUNT</span></article>
-        <article class="feature-card"><span class="feature-number">03 —</span><div class="feature-art wave-art" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><h3>REACTIVE LIGHT</h3><p>Light trails, subtle glow and animated particles turn a simple camera feed into a digital art experiment.</p><span class="feature-tag">CANVAS 2D · JAVASCRIPT</span></article>
+        <article class="feature-card"><span class="feature-number">02 —</span><div class="feature-art hand-art" aria-hidden="true"><div class="hand-abstract"><i></i><i></i><i></i><i></i><i></i></div></div><h3>GESTURE CONTROL</h3><p>Show fingers to switch visual modes in AUTO. Switch to manual control whenever you want to explore without the camera.</p><span class="feature-tag">HEURISTIC FINGER COUNT</span></article>
+        <article class="feature-card"><span class="feature-number">03 —</span><div class="feature-art wave-art" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><h3>REACTIVE LIGHT</h3><p>Orbit rings, flowing waves, a luminous bloom and particle bursts respond to your movements with adaptive rendering.</p><span class="feature-tag">VISION ENGINE 02 · CANVAS 2D</span></article>
       </div>
     </section>
 
     <section class="privacy-section page-shell" id="privacy" aria-labelledby="privacy-heading">
-      <div class="section-label"><span>03 /</span> THE TRUST LAYER <div class="hairline"></div><span>PRIVACY FIRST</span></div>
-      <div class="privacy-panel"><div><span class="privacy-eyebrow">YOUR CAMERA. YOUR CONTROL.</span><h2 id="privacy-heading">YOUR FACE ISN'T<br><em>OUR DATA.</em></h2><p>We do not implement account creation, image recording, biometric identification, frame uploads, or a database. Your camera frames are processed by MediaPipe in your browser for this visualization. Camera permission is requested only after your action; Stop releases the video tracks, and leaving the tab stops the camera.</p><p class="fine-print"><strong>External connections:</strong> This version downloads MediaPipe code from jsDelivr and AI models from Google storage. Google's MediaPipe documentation notes that usage and performance metrics may be sent to Google. No software can guarantee absolute privacy or security; review the dependencies and host configuration before production use.</p></div><div class="privacy-emblem" aria-hidden="true"><div class="emblem-ring a"></div><div class="emblem-ring b"></div><div class="emblem-ring c"></div><div class="emblem-center">NV<span>.</span></div></div></div>
+      <div class="section-label"><span>04 /</span> THE TRUST LAYER <div class="hairline"></div><span>PRIVACY FIRST</span></div>
+      <div class="privacy-panel"><div><span class="privacy-eyebrow">YOUR CAMERA. YOUR CONTROL.</span><h2 id="privacy-heading">YOUR FACE ISN'T<br><em>OUR DATA.</em></h2><p>We do not implement account creation, image recording, biometric identification, frame uploads, or a database. Your camera frames are processed by MediaPipe in your browser for this visualization; manual effect previews work without camera access. Camera permission is requested only after your action; Stop releases the video tracks, and leaving the tab stops the camera.</p><p class="fine-print"><strong>External connections:</strong> This version downloads MediaPipe code from jsDelivr and AI models from Google storage. Google's MediaPipe documentation notes that usage and performance metrics may be sent to Google. No software can guarantee absolute privacy or security; review the dependencies and host configuration before production use.</p></div><div class="privacy-emblem" aria-hidden="true"><div class="emblem-ring a"></div><div class="emblem-ring b"></div><div class="emblem-ring c"></div><div class="emblem-center">NV<span>.</span></div></div></div>
     </section>
   </main>
 

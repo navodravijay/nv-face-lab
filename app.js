@@ -4,6 +4,8 @@
  * No images/video or landmarks are persisted, uploaded, logged, or stored by this code.
  */
 import { calculateInferenceGap, getCameraConstraints } from "./performance.mjs";
+import { VISUAL_MODES, SELECTABLE_MODES, modeForFingerCount, resolvedQuality, particleBudget, progressBetween } from "./visual-engine.mjs";
+import { createGestureStabilizer, SENSITIVITY_PRESETS } from "./gesture-engine.mjs";
 
 const MP_VERSION = "1.1.1";
 const MP_IMPORT = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -22,23 +24,31 @@ const dom = {
   trackingDetail: $("tracking-detail"), faceCount: $("face-count"), handCount: $("hand-count"),
   gestureName: $("gesture-name"), gestureDetail: $("gesture-detail"),
   fingersValue: $("fingers-value"), meterFill: $("meter-fill"),
+  gestureSignal: $("gesture-signal"), sensitivitySelect: $("sensitivity-select"),
   ghost: $("ghost-toggle"), mesh: $("mesh-toggle"), motion: $("motion-toggle"),
-  announcements: $("announcements")
+  announcements: $("announcements"),
+  modeButtons: Array.from(document.querySelectorAll("[data-effect]")),
+  modeHelp: $("mode-help"), visualModeLabel: $("visual-mode-label"), fxDriven: $("fx-driven"),
+  stageModeIndicator: $("stage-mode-indicator"), stageModeCaption: $("stage-mode-caption"),
+  qualitySelect: $("quality-select")
 };
 const ctx = dom.canvas.getContext("2d", { alpha: true });
 const prefersLessMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false;
 dom.motion.checked = prefersLessMotion;
 
 const colors = ["#4de0ff", "#4d8dff", "#bd9cff", "#66efc8", "#f5ca86", "#4de0ff"];
+const gestureStabilizer = createGestureStabilizer();
 const modes = ["ZERO / PULSE", "ONE / ORBIT", "TWO / PRISM", "THREE / FLUX", "FOUR / BLOOM", "FIVE / SUPERNOVA"];
 const state = {
   running: false, loading: false, stream: null, generation: 0, modelPromise: null,
   vision: null, faceTask: null, handTask: null, faceLandmarks: [], handLandmarks: [],
   faceConnections: [], faceOval: [], leftEye: [], rightEye: [], lips: [],
-  handCount: 0, stableFingers: null, proposedFingers: null, proposedFrames: 0,
+  handCount: 0, stableFingers: null, gestureSensitivity: "steady",
   lastVideoTime: -1, lastInference: 0, inferenceGapMs: 50, fps: 0, lastFpsAt: 0,
   fpsFrames: 0, color: colors[0], motionReduced: prefersLessMotion, meshEnabled: true,
-  viewportW: 800, viewportH: 450, particles: [], ambience: [], frameId: 0, lastDrawAt: 0
+  viewportW: 800, viewportH: 450, particles: [], ambience: [], frameId: 0, lastDrawAt: 0,
+  manualMode: "auto", visualMode: "calm", previousVisualMode: "calm", modeChangedAt: -1000,
+  quality: "adaptive", renderQuality: resolvedQuality("adaptive", navigator.hardwareConcurrency, navigator.connection?.saveData === true)
 };
 
 function setStatus(mode, main, detail, scan) {
@@ -64,14 +74,16 @@ function setLoading(isLoading) {
 }
 function resetReadouts() {
   state.faceLandmarks = []; state.handLandmarks = []; state.handCount = 0;
-  state.stableFingers = null; state.proposedFingers = null; state.proposedFrames = 0;
+  state.stableFingers = null; gestureStabilizer.reset();
   state.lastVideoTime = -1; state.lastInference = 0; state.inferenceGapMs = 50; state.fps = 0;
   state.fpsFrames = 0; state.lastFpsAt = 0; state.particles.length = 0;
   state.color = colors[0];
+  updateVisualMode();
   dom.faceCount.textContent = "—"; dom.handCount.textContent = "—";
   dom.gestureName.textContent = "AWAITING INPUT";
   dom.gestureDetail.textContent = "Show your hand to shift the scene.";
   dom.fingersValue.textContent = "— / 5"; dom.meterFill.style.width = "0%";
+  dom.gestureSignal.textContent = "AWAITING CAMERA INPUT";
   dom.stageFps.textContent = "-- TRACK/S"; dom.coords.textContent = "X — / Y —";
 }
 
@@ -238,9 +250,10 @@ function setGesture(next) {
     dom.gestureDetail.textContent = next === 5 ? "Open hand → particle burst activated." : `${next} finger${next===1?"":"s"} visible · scene color changed`;
     dom.fingersValue.textContent = `${next} / 5`;
     dom.meterFill.style.width = `${next*20}%`;
-    if (next === 5) spawnBurst();
+
   }
   dom.stage.style.setProperty("--accent",state.color);
+  updateVisualMode();
 }
 function infer(frameTime) {
   if (!state.running || !state.faceTask || !state.handTask || dom.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
@@ -269,9 +282,15 @@ function infer(frameTime) {
       dom.coords.textContent = "X — / Y —";
     }
     const next = state.handCount ? fingerCount(state.handLandmarks) : null;
-    if (next === state.proposedFingers) state.proposedFrames++;
-    else { state.proposedFingers = next; state.proposedFrames = 1; }
-    if (state.proposedFrames >= 3) setGesture(next);
+    const stabilized = gestureStabilizer.sample(next, frameTime, state.gestureSensitivity);
+    if (stabilized.changed) setGesture(stabilized.value);
+    dom.gestureSignal.textContent = ({
+      waiting: "NO HAND / READY",
+      reacquiring: "SIGNAL LOST / HOLDING",
+      stabilizing: "HOLD GESTURE STEADY…",
+      confirmed: "GESTURE CONFIRMED",
+      invalid: "WAITING FOR VALID INPUT"
+    })[stabilized.phase];
     state.fpsFrames++;
     if (!state.lastFpsAt) state.lastFpsAt = frameTime;
     if (frameTime - state.lastFpsAt > 950) {
@@ -295,14 +314,16 @@ function infer(frameTime) {
 
 function resizeCanvas() {
   const bounds = dom.stage.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const ratio = state.renderQuality === "cinematic" ? 2 : state.renderQuality === "performance" ? 1 : 1.5;
+  const dpr = Math.min(window.devicePixelRatio || 1, ratio);
   const w = Math.max(1,Math.round(bounds.width));
   const h = Math.max(1,Math.round(bounds.height));
   if (w===state.viewportW && h===state.viewportH && dom.canvas.width===Math.round(w*dpr)) return;
   state.viewportW=w; state.viewportH=h;
   dom.canvas.width = Math.round(w*dpr); dom.canvas.height = Math.round(h*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  state.ambience = Array.from({length:Math.max(30,Math.round(w*h/11000))},(_,i)=>({
+  const density = state.renderQuality === "performance" ? 18000 : 11000;
+  state.ambience = Array.from({length:Math.max(22, Math.min(140, Math.round(w*h/density)))},(_,i)=>({
     x:((i*73.39+17)%101)/101*w, y:((i*42.23+13)%97)/97*h,
     radius:.45+(i%3)*.3, phase:(i*1.77)%6.28
   }));
@@ -408,33 +429,150 @@ function renderLandmarks(ms) {
     ctx.restore();
   }
 }
-function spawnBurst() {
-  if(state.motionReduced) return;
-  const src=state.faceLandmarks?.[1] ? projected(state.faceLandmarks[1]) : {x:state.viewportW*.5,y:state.viewportH*.47};
-  state.particles=[];
-  for(let i=0;i<100;i++){
-    const ang=(i*2.399963229728653)%6.283;
-    const sp=1.8+(i%11)*.42;
-    state.particles.push({x:src.x+(i%9-4)*2,y:src.y+(i%5-2)*2,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:1,size:1+(i%4)*.65});
+function accentCenter() {
+  if (state.faceLandmarks.length) return projected(state.faceLandmarks[1] || state.faceLandmarks[0]);
+  return {x:state.viewportW*.5, y:state.viewportH*.45};
+}
+function handAnchor() {
+  if (state.handLandmarks.length) return projected(state.handLandmarks[9]);
+  return null;
+}
+function updateVisualMode() {
+  const next = state.manualMode === "auto" ? modeForFingerCount(state.stableFingers) : state.manualMode;
+  if (next !== state.visualMode) {
+    state.previousVisualMode = state.visualMode;
+    state.visualMode = next;
+    state.modeChangedAt = performance.now();
+    if (next === "burst") spawnBurst();
+  }
+  const definition = VISUAL_MODES[state.visualMode];
+  dom.visualModeLabel.textContent = definition.label;
+  dom.stageModeIndicator.textContent = definition.label;
+  dom.stageModeCaption.textContent = definition.description.toUpperCase();
+  dom.fxDriven.textContent = state.manualMode === "auto" ? "AUTO / GESTURE-DRIVEN" : "MANUAL / CREATIVE CONTROL";
+  dom.modeHelp.textContent = state.manualMode === "auto"
+    ? "AUTO follows your hand · or choose a look"
+    : `MANUAL · ${definition.description}${state.running ? "" : " · CAMERA OFF"}`;
+  dom.stage.dataset.visualMode = state.visualMode;
+  for (const button of dom.modeButtons) {
+    const selected = button.dataset.effect === state.manualMode;
+    button.setAttribute("aria-pressed", String(selected));
+    button.classList.toggle("is-active", selected);
   }
 }
-function drawBurst(){
+function setManualMode(mode) {
+  if (!SELECTABLE_MODES.includes(mode)) return;
+  const repeatBurst = mode === "burst" && state.manualMode === "burst";
+  state.manualMode = mode;
+  updateVisualMode();
+  if (repeatBurst) spawnBurst();
+  announce(`${mode === "auto" ? "Automatic gesture effects enabled" : `${VISUAL_MODES[mode].label} visual preview selected`}. ${state.running ? "Camera remains active." : "Camera is off."}`);
+}
+function spawnBurst() {
+  if(state.motionReduced) return;
+  const src = accentCenter();
+  const budget = particleBudget(state.renderQuality, state.motionReduced);
+  state.particles = [];
+  for(let i=0;i<budget;i++){
+    const ang=(i*2.399963229728653)%6.283;
+    const sp=1.35+(i%13)*.33;
+    state.particles.push({x:src.x+(i%9-4)*2,y:src.y+(i%5-2)*2,
+      vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:1,size:.85+(i%4)*.6});
+  }
+}
+function drawBurst() {
   if(!state.particles.length)return;
-  ctx.save();ctx.shadowColor=state.color;ctx.shadowBlur=10;
+  ctx.save();ctx.shadowColor=state.color;ctx.shadowBlur=state.renderQuality==="performance"?3:10;
   for(const p of state.particles){
-    p.x+=p.vx;p.y+=p.vy;p.vx*=.985;p.vy*=.985;p.life-=.012;
+    p.x+=p.vx;p.y+=p.vy;p.vx*=.984;p.vy*=.984;p.life-=state.renderQuality==="performance"?.018:.012;
     ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=state.color;
     ctx.fillRect(p.x,p.y,p.size,p.size);
   }
   ctx.restore();state.particles=state.particles.filter(p=>p.life>0);
+}
+function drawEffect(ms, mode, alpha=1) {
+  const center=accentCenter(), hand=handAnchor();
+  const t=state.motionReduced?0:ms*.001;
+  const s=Math.min(state.viewportW,state.viewportH);
+  const intensity=state.renderQuality==="performance"?.7:1;
+  ctx.save();ctx.translate(center.x,center.y);ctx.globalAlpha*=alpha;
+  ctx.strokeStyle=state.color;ctx.fillStyle=state.color;
+  ctx.lineCap="round";
+  if(mode==="calm") {
+    const r=s*.19;
+    ctx.globalAlpha*=.34;
+    ctx.lineWidth=1;
+    for(let k=0;k<3;k++) {
+      const rr=r*(.8+k*.24)+(state.motionReduced?0:Math.sin(t*.65+k)*3);
+      ctx.beginPath();ctx.ellipse(0,0,rr,rr*1.2,0,0,Math.PI*2);ctx.stroke();
+    }
+  } else if(mode==="orbit") {
+    const radius=s*.225;
+    for(let ring=0;ring<3;ring++) {
+      const a=t*(ring%2===0?.28:-.22)+ring*1.047;
+      ctx.save();ctx.rotate(a);ctx.lineWidth=ring===0?1.6:.9;ctx.globalAlpha*=ring===0?.72:.42;
+      ctx.beginPath();ctx.ellipse(0,0,radius*(.9+ring*.14),radius*.44,Math.PI/6,0,Math.PI*2);ctx.stroke();
+      for(let j=0;j<(state.renderQuality==="performance"?6:13);j++){
+        const theta=j/(state.renderQuality==="performance"?6:13)*Math.PI*2+t*.5;
+        const x=Math.cos(theta)*radius*(.9+ring*.14),y=Math.sin(theta)*radius*.44;
+        ctx.beginPath();ctx.arc(x,y,j%4===0?2.5:1.2,0,Math.PI*2);ctx.fill();
+      }
+      ctx.restore();
+    }
+  } else if(mode==="wave") {
+    const w=state.viewportW*.61;
+    const amplitude=s*.055*(hand?1.3:1);
+    const bands=state.renderQuality==="performance"?4:7;
+    for(let k=0;k<bands;k++) {
+      ctx.globalAlpha=alpha*(.11+k*.062)*intensity;
+      ctx.lineWidth=k%3===0?1.8:.9;
+      ctx.beginPath();
+      for(let i=0;i<=55;i++){
+        const x=-w/2+(i/55)*w;
+        const y=(k-(bands-1)/2)*12+Math.sin((i/55)*Math.PI*4.5-t*1.5+k*.53)*amplitude;
+        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+  } else if(mode==="bloom") {
+    const petals=state.renderQuality==="performance"?8:12;
+    const base=s*.115+(state.motionReduced?0:Math.sin(t*1.4)*6);
+    for(let i=0;i<petals;i++) {
+      ctx.save();ctx.rotate(i*2*Math.PI/petals+t*.07);
+      ctx.globalAlpha=alpha*(.22+(i%3)*.065)*intensity;ctx.lineWidth=i%2===0?1.4:.8;
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.bezierCurveTo(base*.95,-base*.47,base*2,-base*.18,base*1.6,0);
+      ctx.bezierCurveTo(base*2,base*.18,base*.95,base*.47,0,0);ctx.stroke();
+      ctx.restore();
+    }
+  } else if(mode==="burst") {
+    const count=state.renderQuality==="performance"?18:34;
+    const phase=t*.25;
+    for(let i=0;i<count;i++){
+      const a=i*Math.PI*2/count+phase;
+      const r=s*(.20+(i%5)*.013);
+      ctx.globalAlpha=alpha*(.22+(i%4)*.11);
+      ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.65,Math.sin(a)*r*.65);
+      ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function renderVisualFX(ms) {
+  const prog=progressBetween(state.modeChangedAt, ms, 520);
+  if(prog<1 && state.previousVisualMode!==state.visualMode){
+    drawEffect(ms,state.previousVisualMode,1-prog);
+    drawEffect(ms,state.visualMode,prog);
+  } else drawEffect(ms,state.visualMode,1);
 }
 function draw(ms){
   if(!ctx)return;
   resizeCanvas();const {viewportW:w,viewportH:h}=state;
   ctx.clearRect(0,0,w,h);
   drawEnvironment(ms);
-  if(state.running && (state.faceLandmarks.length||state.handLandmarks.length))renderLandmarks(ms);
-  else if(!state.running)drawIdle(ms);
+  if(!state.running) drawIdle(ms);
+  renderVisualFX(ms);
+  if(state.running && (state.faceLandmarks.length||state.handLandmarks.length)) renderLandmarks(ms);
   drawBurst();
 }
 function tick(time){
@@ -442,7 +580,7 @@ function tick(time){
   // throttled. Workers are a separate tested Phase 2 migration.
   if (!document.hidden) {
     if (state.running) infer(time);
-    const drawInterval = state.motionReduced ? 90 : 28;
+    const drawInterval = state.motionReduced ? 95 : state.renderQuality === "performance" ? 45 : state.renderQuality === "cinematic" ? 20 : 29;
     if (time - state.lastDrawAt >= drawInterval) { draw(time); state.lastDrawAt = time; }
   }
   state.frameId=requestAnimationFrame(tick);
@@ -451,6 +589,23 @@ function tick(time){
 // UI and privacy lifecycle.
 dom.consent.addEventListener("change",()=>{dom.start.disabled=!dom.consent.checked || state.running || state.loading;if(!dom.consent.checked&&(state.running||state.loading))stopCamera("Camera stopped because consent was withdrawn.");});
 dom.start.addEventListener("click",startCamera);
+for(const button of dom.modeButtons) button.addEventListener("click", () => setManualMode(button.dataset.effect));
+dom.sensitivitySelect.addEventListener("change", () => {
+  const preset = dom.sensitivitySelect.value;
+  if (!Object.hasOwn(SENSITIVITY_PRESETS, preset)) return;
+  state.gestureSensitivity = preset;
+  gestureStabilizer.reset();
+  // Avoid stale visual effects from a previous sensitivity mode.
+  setGesture(null);
+  dom.gestureSignal.textContent = state.running ? "READY FOR NEXT GESTURE" : "AWAITING CAMERA INPUT";
+  announce(`Gesture response set to ${preset}. ${preset === "steady" ? "Holds gestures longer to reduce flicker." : "Switches modes faster."}`);
+});
+dom.qualitySelect.addEventListener("change", () => {
+  state.quality = dom.qualitySelect.value;
+  state.renderQuality = resolvedQuality(state.quality, navigator.hardwareConcurrency, navigator.connection?.saveData === true);
+  resizeCanvas();
+  announce(`Rendering quality is now ${state.renderQuality}.`);
+});
 dom.stop.addEventListener("click",()=>stopCamera("Camera stopped. The session has ended."));
 dom.ghost.addEventListener("change",()=>dom.stage.classList.toggle("no-ghost",!dom.ghost.checked));
 dom.mesh.addEventListener("change",()=>{state.meshEnabled=dom.mesh.checked;});

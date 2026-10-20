@@ -1,78 +1,98 @@
-# NV. FACE LAB — Version 2 / Phase 1 preview candidate
+# NV. FACE LAB — V2.1 Gesture Stability Update
 
-A standalone, responsive computer-vision visual experiment for **NV SHARP SOLUTIONS**. Uses original HTML, CSS and JavaScript with Google's MediaPipe Tasks Vision SDK to render on-device face landmarks and heuristic hand-gesture-driven neon visual effects.
+**An original real-time face and hand landmark visualization experiment.**
 
-## Quick start
+**Developer:** Navod Ravindu Jayaweera  
+**Studio:** NV SHARP SOLUTIONS  
+**Main website:** https://nv-sharp-solutions.pages.dev/  
+**Live production:** https://nv-face-lab.pages.dev/ (verify its current commit before release)  
+**GitHub:** https://github.com/navodravijay/nv-face-lab
 
-1. Extract the ZIP and keep `index.html`, `styles.css`, `app.js`, `performance.mjs`, `favicon.svg` and `_headers` together.
-2. For local development, open a terminal in this directory and run `python -m http.server 8000` (or `npx serve .`), then visit `http://localhost:8000`.
-3. Read the consent notice, check the consent checkbox, then press **Start experience**. Your browser will request webcam permission.
-4. Hold up 0–5 fingers to change the neon palette. Five fingers also trigger a particle burst. Use **Stop camera** to release your webcam.
-5. Push these **extracted files** (not the ZIP file) into the root of your own GitHub repository, such as `nv-face-lab`. Connect that repository to a separate Cloudflare Pages project using **Connect to Git**. Cloudflare then deploys changes automatically whenever you push to the production branch. The `_headers` file adds defensive HTTP response headers.
+## What changed in V2.1 (relative to the V2 Visual Engine)
 
-Do not open `index.html` using a `file://` URL. Camera access needs HTTPS or localhost.
+- Improved AUTO gesture stability with **time-based hysteresis**, replacing the former fixed three-frame acceptance. Better tolerance of brief missed detections while face/hand inference rates vary.
+- **Gesture response** setting: Steady / Smooth (default; 220 ms gesture confirmation, 390 ms lost-hand grace) or Responsive / Fast (110 ms, 260 ms). It affects mode changes only, not camera capture or AI model inference.
+- Clear visible hand-signal feedback: stabilizing, confirmed, briefly lost, or no hand. Status stays local and is not stored.
+- Improved unit tests for gesture jitter, no-hand dropout, invalid input and performance-mode independence.
+- No new third-party dependencies, external requests or storage.
+- Tests alone are insufficient for production approval; validate actual camera behavior in Cloudflare Preview.
 
-## Existing GitHub → Cloudflare Pages deployment (preview-first)
+## What changed in V2
 
-The production repo is **https://github.com/navodravijay/nv-face-lab** and its production site is **https://nv-face-lab.pages.dev/**. Do **not** create another repository or Cloudflare project, and do **not** upload this ZIP to `main` directly.
+This release builds on the confirmed working V2 Phase 1 source, **not** on the original third-party neon-face-scan project.
 
-1. Preserve the currently working `main` commit. Create a new GitHub branch named `feature/v2-premium-hybrid` from that commit.
-2. Upload the **extracted individual files** from this package into the new branch's repository root. File names and paths matter; `performance.mjs` must be beside `app.js`. For the repository's stray `download` file containing `.gitignore` entries, rename/delete it in the feature branch as appropriate and use `.gitignore` in the repository root.
-3. GitHub → Cloudflare Pages auto-deployment should create a **preview** for that branch if preview deployments are enabled. If no preview appears, review Cloudflare Pages → Settings → Builds & deployments / branch controls.
-4. On the HTTPS preview, verify actual camera start/stop, Face and Hand Landmarker functionality, consent, cross-browser behavior, console, privacy notices, performance, and response headers. See `RELEASE_CHECKLIST.md`.
-5. Only after passing checks, open a PR from `feature/v2-premium-hybrid` into `main`, review the diff, and merge. Cloudflare should automatically deploy the production branch. Verify the live site and retain the previous commit for rollback.
+- Added original CSS 3D-style `NV.` hero sculpture and a visibly new premium hybrid layout.
+- Added an interactive **AUTO / CALM / ORBIT / WAVE / BLOOM / BURST** creative deck.
+- AUTO translates hand finger count into visual modes: 0=Calm, 1=Orbit, 2–3=Wave, 4=Bloom, 5=Burst. Finger detection is heuristic and varies by hand angle and lighting.
+- Visual modes are implemented in Canvas 2D. They can be explored manually **without turning on the camera**.
+- Added smoother transitions between visual modes, an effect status display, a particle-burst behavior, and quality controls.
+- Added adaptive, performance, and cinematic rendering modes, capped particle counts and reduced-motion support.
+- Retained V1 camera consent, stop/disconnect/hidden-tab handling, MediaPipe tasks, and Phase 1 adaptive inference scheduler.
+- Preserved developer credit, main website links, brand `NV.` punctuation and colors (#080d1b / #4d8dff / #4de0ff).
 
-> This archive is a **preview candidate**, not evidence of a tested production release. The code is built by merging Phase 1 changes onto the user's uploaded repository ZIP, which matched the previously provided V1 files for every tracked website asset (the only extra file was `download`, containing `.gitignore` rules). No GitHub push or Cloudflare deployment was performed here.
+## Important design distinctions
 
-## Phase 1 improvements and tests
+- **Face tracking is not face recognition**. The app draws anatomical landmarks; it does not identify people.
+- **Offline effects:** manually clicking visual modes is allowed while camera is off; clicking Start still requires informed consent.
+- **Automatic gestures:** if the camera is live and AUTO is selected, recognized hand gestures select rendering modes. Manual modes override automatic effect selection; the face/hand telemetry remains active.
+- **Privacy:** application code does not intentionally save, record, upload or persist camera frames, face templates or landmarks, but external code/model assets are downloaded from third-party origins. Google's MediaPipe documentation describes collection of some usage/performance metrics. Review documentation and network behavior before launch.
+- **Canvas 2D, not real 3D geometry**: the hero illustration uses CSS transforms; the face renderer and the effects use Canvas 2D.
 
-- Adaptive inference throttling between 50–180 ms based on synchronous detection duration.
-- Data-saver / low-core-count camera requests: ideal 640x480 at 24 fps, preserving normal desktop settings on faster hardware.
-- Camera-playback timeout and clearer errors for startup failures.
-- Readout renamed from FPS to **TRACK/S** to avoid confusing inference frequency with display frame rate.
-- Run `node --test tests/*.test.mjs`, `node --check app.js`, and `node --check performance.mjs` to check pure helpers, security invariants, and syntax.
+## Repository layout
 
-## What is included
+```text
+index.html        # Static interface and accessible controls
+styles.css        # Site design and responsive visual engine styles
+app.js            # Webcam, MediaPipe, Canvas and UI orchestration
+visual-engine.mjs # Tested, pure visual mode / quality helpers
+gesture-engine.mjs # Pure, tested frame-rate-independent gesture stabilizer
+performance.mjs   # Tested, pure inference gap and camera helpers
+favicon.svg
+_headers          # Cloudflare Pages response headers and CSP
+tests/*.test.mjs  # Node.js regression tests
+README.md
+RELEASE_CHECKLIST.md
+```
 
-- One face and one hand can be tracked in the browser via MediaPipe.
-- Face mesh and contours, hand connections, finger-count heuristic, color responses, particle effects, idle wireframe sculpture.
-- Responsive desktop/mobile UI with controls for camera preview, mesh and reduced motion.
-- Explicit opt-in for local camera processing. Video and audio are not transmitted by this application code. The app does not implement recording, accounts, analytics, tracking pixels, external logging, or data storage.
-- MediaPipe source and WASM pinned at version **1.1.1**, compatible model URLs pinned to version 1.
-- HTTPS production policy in `_headers` with CSP, Permissions-Policy and other defense-in-depth headers.
+## Local development
 
-## Privacy & security notes (important)
+Run from a local development server instead of directly opening `index.html` as `file://`.
 
-- **Only use Start after informed consent.** The browser controls actual camera permission. When Stop is pressed, consent is withdrawn, or the tab becomes hidden/navigates away, camera tracks are stopped.
-- Frames and landmark coordinates are processed locally and not sent to a server by this project's code. No microphone permission is requested.
-- **Third-party network requests:** This starter downloads MediaPipe JavaScript and WASM from `cdn.jsdelivr.net` and task models from `storage.googleapis.com` after the user starts. Those servers necessarily see ordinary network request metadata such as IP addresses. Google's MediaPipe documentation states that *usage/performance metrics can be sent to Google*. Obtain any legally necessary consent, and review applicable policies before deploying for public users.
-- The supplied CSP allows only the listed asset origins. The runtime's own metrics endpoint behavior is outside the scope of this standalone project; CSP may block some third-party metrics calls. Do not claim the SDK never transmits any network data.
-- Third-party CDN delivery is version-pinned but is not cryptographically integrity-locked here. For high-assurance deployment, review and self-host version-locked dependencies and models, verify asset hashes and licenses, then tighten `connect-src` and `script-src` to `'self'` after testing.
-- This visualization is **face tracking, not biometric identification**. It does not authenticate people, recognize identities or determine who they are. Do not market it as access control or identity verification.
-- Finger counting is approximate, dependent on lighting and hand angle, and is not a trained sign-language interpreter. UI `TRACK/S` readings represent approximate completed inference cycles per second (not display FPS).
-- Safari, Chrome and Android/browser support varies. MediaPipe uses synchronous inference on the main thread with adaptive throttling, which may still cause jank on older devices. A dedicated Worker may help in a later phase, but requires real-browser WebGL/OffscreenCanvas tests.
-- There is no formal penetration-test, compatibility test on physical cameras, or independent privacy audit. Do not claim this project is 100% secure.
+```bash
+python -m http.server 8000
+```
 
-## Security and performance checklist before client deployment
+Open http://localhost:8000/ in an up-to-date browser. Camera capture requires HTTPS (on Cloudflare) or an allowed secure localhost origin. MediaPipe code/models are retrieved over the network when the user explicitly starts the experience.
 
-- [ ] Verify camera permission, denial and camera disconnection states on target devices.
-- [ ] Verify that Stop, permission withdrawal, hidden tabs and navigation all stop the camera indicator.
-- [ ] Use DevTools > Network to inspect all requests, confirming no camera frames are sent.
-- [ ] Check the CSP console for blocked required resources and test on the actual static host.
-- [ ] Monitor dependency advisories; do not silently change MediaPipe version or model paths.
-- [ ] Review Google's MediaPipe license and privacy disclosures plus applicable consent requirements.
-- [ ] Run Lighthouse and inspect rendering smoothness on mid-range phones.
-- [ ] Consider a privacy notice localized for your audience and a contact for privacy inquiries.
+Run automated tests (Node.js 18+ recommended):
 
-## Official technical references
+```bash
+node --test tests/*.test.mjs
+```
 
-- https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js
-- https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/web_js
-- https://developers.google.com/edge/mediapipe/solutions/tasks (privacy notice)
-- https://owasp.org/www-project-secure-headers/
+The repo deliberately has no npm build step or package installation and should stay a static Cloudflare Pages project with Build command **blank** and Build output directory **`.`**.
 
-## Attribution
+## GitHub → Cloudflare Pages preview workflow
 
-**Designed & Developed by Navod Ravindu Jayaweera** for NV SHARP SOLUTIONS.
+**Do not upload this V2.1 update to `main` until the checklist passes.** The earlier V2 Visual Engine was already accidentally uploaded to production; this V2.1 package should go ONLY to `feature/v2-premium-hybrid` for testing.
 
-Original NV. FACE LAB app code and design. Powered by MediaPipe, a Google project distributed under its own terms. This project is **not** a copy of the `rukiya98/neon-face-scan` repository, nor does it represent any endorsement or affiliation with that repository.
+1. Open `https://github.com/navodravijay/nv-face-lab` and select branch `feature/v2-premium-hybrid`.
+2. Unzip the release locally; upload the files and folders **inside** the ZIP to the **repository root**. Replace existing files and commit, e.g., `Build V2 Premium Hybrid Visual Engine`.
+3. In Cloudflare Pages → Deployments, open the **newest Preview** deployment for `feature/v2-premium-hybrid`.
+4. Test modes while camera is off, then consent and test webcam, face/hand tracking, camera stop and browser permissions on real desktops and phones.
+5. Verify response security headers via browser DevTools, and run performance/accessibility tests. **Do not** treat automated syntax checks as production certification.
+6. After checks, create and merge a Pull Request into `main` to trigger the existing production deployment. Preserve the last known-good commit as a rollback point.
+
+Production website and repositories were **not modified by producing this ZIP**.
+
+## Security considerations
+
+- All external MediaPipe script and model URLs are pinned to a specific version, but they are still third-party resources. For production hardening, review/checksum and self-host verified bundles/models when the licensing and deployment plan permit it.
+- The current CSP in `_headers` permits MediaPipe modules and WASM; its restrictions are less strict than fully self-hosted dependencies. Check deployment security headers rather than assuming the file is applied.
+- Do not add facial identification, image recording, user analytics, or backend storage without a separate privacy and threat-model review.
+- FPS/performance and finger counts are UI statistics, not biometric claims. Results can vary by browser, device and lighting.
+- `quality=cinematic` intentionally consumes more resources; Performance and Reduce motion are provided as alternatives.
+
+## Acknowledgment and licensing
+
+This is an original NV SHARP SOLUTIONS interface and visualization, built with Google's MediaPipe Tasks Vision. Its dependencies have their own licenses; review them before redistribution. This code does not copy the neon-face-scan repository source code. V2 inherits the project's existing license status; **no license grant is invented here**.

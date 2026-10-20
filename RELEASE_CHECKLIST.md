@@ -1,45 +1,53 @@
-# NV. FACE LAB V2 Phase 1 — Release checklist
+# V2 Premium Hybrid — release checklist
 
-## Source baseline — mandatory
-- [x] Compared the uploaded `nv-face-lab-main.zip` website source files with the original V1 ZIP; `README.md`, `_headers`, `app.js`, `favicon.svg`, `index.html`, `styles.css` matched byte for byte. GitHub remote and current commit state are not independently verified.
-- [x] Merged reviewed Phase 1 changes over the user-supplied ZIP while retaining unchanged original assets and headers; an extra `download` file containing `.gitignore` rules was replaced with properly named `.gitignore`. Check for newer remote commits before upload.
-- [ ] Preserve a link to the last working commit and current Cloudflare production deployment.
+Use a Cloudflare **Preview deployment** from `feature/v2-premium-hybrid`, not production, for all testing until the criteria below pass. Complete the checklist with actual observations from the user's browser/devices.
 
-## Change scope
-- Adaptive 50–180 ms inference interval based on last synchronous inference duration (helps but does not eliminate jank).
-- Low-power camera request 640x480@24fps on <=4-core/save-data devices, otherwise 1280x720@30fps ideal.
-- Timeout with cleanup if video.play() never settles; retry remains available.
-- Clear `TRACK/S` label for completed inference calls, not misleading display FPS.
-- Visible experiment/engine revision markers changed to 002; design/colors/credits preserved.
-- Added offline Node tests; no new network dependencies or permissions.
+## Visual / functional
+- [ ] V2 `NV.` holo hero is visible on desktop; original monogram reads exactly `NV.`.
+- [ ] Developer credit says `Navod Ravindu Jayaweera` in Hero and Footer.
+- [ ] AUTO, CALM, ORBIT, WAVE, BLOOM, BURST buttons visibly change the canvas while camera is **off**.
+- [ ] Clicking a mode updates aria-pressed and live visual mode readout.
+- [ ] BURST creates a finite particle scatter animation; clicking BURST again restarts it.
+- [ ] Reduced motion suppresses burst animation and ambient animation as configured.
+- [ ] Performance and Cinematic quality choices change drawing load without UI errors.
+- [ ] Mobile 360px–430px viewport has no horizontal scrolling; stage and camera controls are legible.
+- [ ] Desktop remains usable on 1366px and 1920px viewports.
+- [ ] No important links, buttons or text hidden under overlays.
 
-## Automated tests (run locally)
-```sh
-node --test tests/*.test.mjs
-node --check app.js
-node --check performance.mjs
-```
+## Camera / gesture on real device
+- [ ] Camera is **not** requested merely by opening the website or clicking manual effect buttons.
+- [ ] Camera starts only after explicit consent and Start click; permission denial is recoverable.
+- [ ] Actual face mesh and the overlay align with the mirrored camera.
+- [ ] Hands are detected, and finger counts 0–5 select modes in AUTO (allow for heuristic errors).
+- [ ] Manual override works while the camera is running; switch back to AUTO restores gesture control.
+- [ ] Stop, tab hidden, permission revocation, and camera unplug release tracks and reset telemetry.
+- [ ] Camera starts again after Stop/Start where permissions allow.
+- [ ] Missing/slow network for MediaPipe is handled without leaving the camera active.
 
-## Manual browser checks — must pass on actual devices
-- [ ] Privacy consent required before Start becomes active.
-- [ ] Start prompts for camera, begins face and hand landmarks without console error.
-- [ ] Unchecking consent during startup and after startup releases camera indicator.
-- [ ] Stop releases all camera tracks, status returns to OFFLINE, no stale face landmarks remain.
-- [ ] Tab background/hide and navigating away release the camera.
-- [ ] Permission denied, no camera, lost device, slow network, and model load failure show helpful errors.
-- [ ] Face/hand detection and 0–5 finger gestures unchanged from V1.
-- [ ] Low-power Android, iOS Safari (if available), desktop Chrome/Edge tested; no severe jank.
-- [ ] Keyboard/focus visibility, high-zoom, reduced-motion and mobile layout still work.
-- [ ] DevTools Network: document all MediaPipe requests, verify camera frames are not uploaded by app code, inspect any usage metrics.
-- [ ] Security response headers checked on deployed preview, CSP not breaking required model downloads.
-- [ ] Dependency and model license/advisory review performed; no independent audit is claimed.
+## Security and privacy
+- [ ] `_headers` is present at the deployed root and live document response includes CSP, Permissions-Policy and X-Content-Type-Options.
+- [ ] Browser console has no script/CSP/asset errors (especially dynamic module + WASM loading).
+- [ ] Network tab shows no unexpected image/frame uploads or unrelated trackers. Review external MediaPipe traffic.
+- [ ] Dependencies pinned and licensing reviewed; no secrets or biometric recordings committed.
+- [ ] Check basic keyboard focus, screen-reader announcements, contrast, reduced motion, and accessibility.
+- [ ] Device CPU/GPU load, frame rate and battery impact acceptable on a mid-range phone.
+- [ ] Run and document automated tests, a Lighthouse/performance review, and relevant OWASP checks.
 
-## GitHub → Cloudflare workflow
-1. Create `feature/v2-premium-hybrid` from the **latest existing `main` branch**; confirm its commit matches the user-uploaded snapshot before applying files.
-2. Compare and cherry-pick/apply these changes to that branch; do not directly replace live production files unless the baseline matches exactly.
-3. Push that feature branch. Check the Cloudflare Pages **preview** deployment for that branch.
-4. Perform the manual checks. Resolve any CSP/runtime issues without broad `unsafe-inline`/`unsafe-eval` exceptions.
-5. Open a PR, review the changes, and merge to `main` only after approval.
-6. Verify deployment at `https://nv-face-lab.pages.dev/`. Roll back using the saved previous commit if necessary.
+## Deploy
+- [ ] Confirm GitHub branch preview points to the latest V2 commit.
+- [ ] Submit a pull request; inspect diff before merge.
+- [ ] Merge only after preview tests pass and rollback commit is available.
+- [ ] Confirm `https://nv-face-lab.pages.dev/` resolves to new production commit and V2 controls work.
 
-No production deployment or GitHub commit was made when this candidate was generated.
+**Validation note:** Node static tests and a synthetic browser UI test are not substitutes for camera, external MediaPipe network, and live Cloudflare CSP testing.
+
+## V2.1-specific gesture acceptance tests
+
+- [ ] With live tracking, hold 1, 2, 4 and 5 fingers steady and verify AUTO picks Orbit, Wave, Bloom and Burst.
+- [ ] Wave a hand or briefly obscure it; visual modes should not flicker rapidly.
+- [ ] Remove your hand; after a short grace interval AUTO returns to Calm.
+- [ ] Compare Steady vs Responsive; gestures should switch faster in Responsive.
+- [ ] Toggle Manual mode with the camera off; manual preview must still work.
+- [ ] Verify Stop Camera releases hardware access, then restart works normally.
+- [ ] Check low-power phones, keyboard focus, screen reader labels, and prefers-reduced-motion.
+- [ ] Check real Cloudflare response headers, Console and Network before merging into main.
