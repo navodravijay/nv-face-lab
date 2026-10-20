@@ -3,6 +3,9 @@
  * MediaPipe dependencies are version pinned and requested only after user consent.
  * No images/video or landmarks are persisted, uploaded, logged, or stored by this code.
  */
+import { calculateInferenceGap, getCameraConstraints } from "./performance.mjs";
+import { VISUAL_MODES, SELECTABLE_MODES, modeForFingerCount, resolvedQuality, particleBudget, progressBetween } from "./visual-engine.mjs";
+
 const MP_VERSION = "1.1.1";
 const MP_IMPORT = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const MP_WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
@@ -21,7 +24,11 @@ const dom = {
   gestureName: $("gesture-name"), gestureDetail: $("gesture-detail"),
   fingersValue: $("fingers-value"), meterFill: $("meter-fill"),
   ghost: $("ghost-toggle"), mesh: $("mesh-toggle"), motion: $("motion-toggle"),
-  announcements: $("announcements")
+  announcements: $("announcements"),
+  modeButtons: Array.from(document.querySelectorAll("[data-effect]")),
+  modeHelp: $("mode-help"), visualModeLabel: $("visual-mode-label"), fxDriven: $("fx-driven"),
+  stageModeIndicator: $("stage-mode-indicator"), stageModeCaption: $("stage-mode-caption"),
+  qualitySelect: $("quality-select")
 };
 const ctx = dom.canvas.getContext("2d", { alpha: true });
 const prefersLessMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false;
@@ -34,9 +41,11 @@ const state = {
   vision: null, faceTask: null, handTask: null, faceLandmarks: [], handLandmarks: [],
   faceConnections: [], faceOval: [], leftEye: [], rightEye: [], lips: [],
   handCount: 0, stableFingers: null, proposedFingers: null, proposedFrames: 0,
-  lastVideoTime: -1, lastInference: 0, fps: 0, lastFpsAt: 0,
+  lastVideoTime: -1, lastInference: 0, inferenceGapMs: 50, fps: 0, lastFpsAt: 0,
   fpsFrames: 0, color: colors[0], motionReduced: prefersLessMotion, meshEnabled: true,
-  viewportW: 800, viewportH: 450, particles: [], ambience: [], frameId: 0, lastDrawAt: 0
+  viewportW: 800, viewportH: 450, particles: [], ambience: [], frameId: 0, lastDrawAt: 0,
+  manualMode: "auto", visualMode: "calm", previousVisualMode: "calm", modeChangedAt: -1000,
+  quality: "adaptive", renderQuality: resolvedQuality("adaptive", navigator.hardwareConcurrency, navigator.connection?.saveData === true)
 };
 
 function setStatus(mode, main, detail, scan) {
@@ -63,14 +72,15 @@ function setLoading(isLoading) {
 function resetReadouts() {
   state.faceLandmarks = []; state.handLandmarks = []; state.handCount = 0;
   state.stableFingers = null; state.proposedFingers = null; state.proposedFrames = 0;
-  state.lastVideoTime = -1; state.lastInference = 0; state.fps = 0;
+  state.lastVideoTime = -1; state.lastInference = 0; state.inferenceGapMs = 50; state.fps = 0;
   state.fpsFrames = 0; state.lastFpsAt = 0; state.particles.length = 0;
   state.color = colors[0];
+  updateVisualMode();
   dom.faceCount.textContent = "—"; dom.handCount.textContent = "—";
   dom.gestureName.textContent = "AWAITING INPUT";
   dom.gestureDetail.textContent = "Show your hand to shift the scene.";
   dom.fingersValue.textContent = "— / 5"; dom.meterFill.style.width = "0%";
-  dom.stageFps.textContent = "-- FPS"; dom.coords.textContent = "X — / Y —";
+  dom.stageFps.textContent = "-- TRACK/S"; dom.coords.textContent = "X — / Y —";
 }
 
 async function initializeModels() {
@@ -127,8 +137,25 @@ function cameraErrorMessage(error) {
   }
 }
 
+async function beginVideoPlayback() {
+  // Some mobile browsers can leave video.play() unresolved after device changes.
+  // Always cancel the timeout even if video.play() rejects first.
+  let timeout;
+  try {
+    await Promise.race([
+      dom.video.play(),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("VideoStartTimeout")), 15000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function startCamera() {
   if (state.loading || state.running || !dom.consent.checked) return;
+  if (!ctx) { showError("Canvas rendering is not available in this browser. Try an updated Chrome, Edge, Firefox or Safari."); return; }
   hideError();
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     showError("Camera access requires HTTPS or localhost in a supported browser. Do not open the HTML directly using file://. See README for local preview steps.");
@@ -143,14 +170,17 @@ async function startCamera() {
   setLoading(true);
   try {
     // Request webcam only as a direct result of the user's Start action.
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia(getCameraConstraints({
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      saveData: navigator.connection?.saveData === true
+    }));
     if (generation !== state.generation) { stream.getTracks().forEach(t => t.stop()); return; }
     state.stream = stream;
     dom.video.srcObject = stream;
     stream.getVideoTracks()[0]?.addEventListener("ended", () => {
       if (generation === state.generation) stopCamera("The camera was disconnected or its permission changed.");
     }, { once: true });
-    await dom.video.play();
+    await beginVideoPlayback();
     dom.scanText.textContent = "INITIALIZING AI MODELS";
     await initializeModels();
     if (generation !== state.generation) return;
@@ -165,7 +195,11 @@ async function startCamera() {
   } catch (error) {
     if (generation !== state.generation) return;
     const cameraErrNames = new Set(["NotAllowedError", "PermissionDeniedError", "NotFoundError", "DevicesNotFoundError", "NotReadableError", "TrackStartError", "OverconstrainedError"]);
-    const message = cameraErrNames.has(error?.name) ? cameraErrorMessage(error) : "Vision engine could not initialize. Check your internet connection (required to load MediaPipe and its models) and try again.";
+    const message = cameraErrNames.has(error?.name)
+      ? cameraErrorMessage(error)
+      : error?.message === "VideoStartTimeout"
+        ? "The camera did not become ready in time. It has been stopped. Check whether another application is using it, then try again."
+        : "Vision engine could not initialize. Check your internet connection (required to load MediaPipe and its models) and try again.";
     stopCamera();
     showError(message);
     // Developer can inspect the original error locally, but avoid exposing private frame data.
@@ -212,15 +246,17 @@ function setGesture(next) {
     dom.gestureDetail.textContent = next === 5 ? "Open hand → particle burst activated." : `${next} finger${next===1?"":"s"} visible · scene color changed`;
     dom.fingersValue.textContent = `${next} / 5`;
     dom.meterFill.style.width = `${next*20}%`;
-    if (next === 5) spawnBurst();
+
   }
   dom.stage.style.setProperty("--accent",state.color);
+  updateVisualMode();
 }
 function infer(frameTime) {
   if (!state.running || !state.faceTask || !state.handTask || dom.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
-  if (dom.video.currentTime === state.lastVideoTime || frameTime - state.lastInference < 50) return;
+  if (dom.video.currentTime === state.lastVideoTime || frameTime - state.lastInference < state.inferenceGapMs) return;
   state.lastVideoTime = dom.video.currentTime;
   state.lastInference = frameTime;
+  const inferenceStartedAt = performance.now();
   try {
     const faceResult = state.faceTask.detectForVideo(dom.video,frameTime);
     const handResult = state.handTask.detectForVideo(dom.video,frameTime);
@@ -250,26 +286,34 @@ function infer(frameTime) {
     if (frameTime - state.lastFpsAt > 950) {
       state.fps = Math.round(state.fpsFrames*1000/(frameTime-state.lastFpsAt));
       state.fpsFrames = 0; state.lastFpsAt = frameTime;
-      dom.stageFps.textContent = `${state.fps} FPS`;
+      dom.stageFps.textContent = `${state.fps} TRACK/S`;
     }
   } catch (error) {
     // Avoid endlessly using a broken media stream; leave a clear recoverable state.
     stopCamera();
     showError("Video tracking encountered an error. The camera has been stopped; you can try again.");
     console.warn("NV Face Lab tracking error:", error?.name || "Error");
+  } finally {
+    // Inference is synchronous. Reduce the inference rate on slower hardware to
+    // preserve room for UI rendering rather than piling up camera frame work.
+    if (state.running) {
+      state.inferenceGapMs = calculateInferenceGap(performance.now() - inferenceStartedAt, state.inferenceGapMs);
+    }
   }
 }
 
 function resizeCanvas() {
   const bounds = dom.stage.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const ratio = state.renderQuality === "cinematic" ? 2 : state.renderQuality === "performance" ? 1 : 1.5;
+  const dpr = Math.min(window.devicePixelRatio || 1, ratio);
   const w = Math.max(1,Math.round(bounds.width));
   const h = Math.max(1,Math.round(bounds.height));
   if (w===state.viewportW && h===state.viewportH && dom.canvas.width===Math.round(w*dpr)) return;
   state.viewportW=w; state.viewportH=h;
   dom.canvas.width = Math.round(w*dpr); dom.canvas.height = Math.round(h*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  state.ambience = Array.from({length:Math.max(30,Math.round(w*h/11000))},(_,i)=>({
+  const density = state.renderQuality === "performance" ? 18000 : 11000;
+  state.ambience = Array.from({length:Math.max(22, Math.min(140, Math.round(w*h/density)))},(_,i)=>({
     x:((i*73.39+17)%101)/101*w, y:((i*42.23+13)%97)/97*h,
     radius:.45+(i%3)*.3, phase:(i*1.77)%6.28
   }));
@@ -375,46 +419,173 @@ function renderLandmarks(ms) {
     ctx.restore();
   }
 }
-function spawnBurst() {
-  if(state.motionReduced) return;
-  const src=state.faceLandmarks?.[1] ? projected(state.faceLandmarks[1]) : {x:state.viewportW*.5,y:state.viewportH*.47};
-  state.particles=[];
-  for(let i=0;i<100;i++){
-    const ang=(i*2.399963229728653)%6.283;
-    const sp=1.8+(i%11)*.42;
-    state.particles.push({x:src.x+(i%9-4)*2,y:src.y+(i%5-2)*2,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:1,size:1+(i%4)*.65});
+function accentCenter() {
+  if (state.faceLandmarks.length) return projected(state.faceLandmarks[1] || state.faceLandmarks[0]);
+  return {x:state.viewportW*.5, y:state.viewportH*.45};
+}
+function handAnchor() {
+  if (state.handLandmarks.length) return projected(state.handLandmarks[9]);
+  return null;
+}
+function updateVisualMode() {
+  const next = state.manualMode === "auto" ? modeForFingerCount(state.stableFingers) : state.manualMode;
+  if (next !== state.visualMode) {
+    state.previousVisualMode = state.visualMode;
+    state.visualMode = next;
+    state.modeChangedAt = performance.now();
+    if (next === "burst") spawnBurst();
+  }
+  const definition = VISUAL_MODES[state.visualMode];
+  dom.visualModeLabel.textContent = definition.label;
+  dom.stageModeIndicator.textContent = definition.label;
+  dom.stageModeCaption.textContent = definition.description.toUpperCase();
+  dom.fxDriven.textContent = state.manualMode === "auto" ? "AUTO / GESTURE-DRIVEN" : "MANUAL / CREATIVE CONTROL";
+  dom.modeHelp.textContent = state.manualMode === "auto"
+    ? "AUTO follows your hand · or choose a look"
+    : `MANUAL · ${definition.description}${state.running ? "" : " · CAMERA OFF"}`;
+  dom.stage.dataset.visualMode = state.visualMode;
+  for (const button of dom.modeButtons) {
+    const selected = button.dataset.effect === state.manualMode;
+    button.setAttribute("aria-pressed", String(selected));
+    button.classList.toggle("is-active", selected);
   }
 }
-function drawBurst(){
+function setManualMode(mode) {
+  if (!SELECTABLE_MODES.includes(mode)) return;
+  const repeatBurst = mode === "burst" && state.manualMode === "burst";
+  state.manualMode = mode;
+  updateVisualMode();
+  if (repeatBurst) spawnBurst();
+  announce(`${mode === "auto" ? "Automatic gesture effects enabled" : `${VISUAL_MODES[mode].label} visual preview selected`}. ${state.running ? "Camera remains active." : "Camera is off."}`);
+}
+function spawnBurst() {
+  if(state.motionReduced) return;
+  const src = accentCenter();
+  const budget = particleBudget(state.renderQuality, state.motionReduced);
+  state.particles = [];
+  for(let i=0;i<budget;i++){
+    const ang=(i*2.399963229728653)%6.283;
+    const sp=1.35+(i%13)*.33;
+    state.particles.push({x:src.x+(i%9-4)*2,y:src.y+(i%5-2)*2,
+      vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:1,size:.85+(i%4)*.6});
+  }
+}
+function drawBurst() {
   if(!state.particles.length)return;
-  ctx.save();ctx.shadowColor=state.color;ctx.shadowBlur=10;
+  ctx.save();ctx.shadowColor=state.color;ctx.shadowBlur=state.renderQuality==="performance"?3:10;
   for(const p of state.particles){
-    p.x+=p.vx;p.y+=p.vy;p.vx*=.985;p.vy*=.985;p.life-=.012;
+    p.x+=p.vx;p.y+=p.vy;p.vx*=.984;p.vy*=.984;p.life-=state.renderQuality==="performance"?.018:.012;
     ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=state.color;
     ctx.fillRect(p.x,p.y,p.size,p.size);
   }
   ctx.restore();state.particles=state.particles.filter(p=>p.life>0);
+}
+function drawEffect(ms, mode, alpha=1) {
+  const center=accentCenter(), hand=handAnchor();
+  const t=state.motionReduced?0:ms*.001;
+  const s=Math.min(state.viewportW,state.viewportH);
+  const intensity=state.renderQuality==="performance"?.7:1;
+  ctx.save();ctx.translate(center.x,center.y);ctx.globalAlpha*=alpha;
+  ctx.strokeStyle=state.color;ctx.fillStyle=state.color;
+  ctx.lineCap="round";
+  if(mode==="calm") {
+    const r=s*.19;
+    ctx.globalAlpha*=.34;
+    ctx.lineWidth=1;
+    for(let k=0;k<3;k++) {
+      const rr=r*(.8+k*.24)+(state.motionReduced?0:Math.sin(t*.65+k)*3);
+      ctx.beginPath();ctx.ellipse(0,0,rr,rr*1.2,0,0,Math.PI*2);ctx.stroke();
+    }
+  } else if(mode==="orbit") {
+    const radius=s*.225;
+    for(let ring=0;ring<3;ring++) {
+      const a=t*(ring%2===0?.28:-.22)+ring*1.047;
+      ctx.save();ctx.rotate(a);ctx.lineWidth=ring===0?1.6:.9;ctx.globalAlpha*=ring===0?.72:.42;
+      ctx.beginPath();ctx.ellipse(0,0,radius*(.9+ring*.14),radius*.44,Math.PI/6,0,Math.PI*2);ctx.stroke();
+      for(let j=0;j<(state.renderQuality==="performance"?6:13);j++){
+        const theta=j/(state.renderQuality==="performance"?6:13)*Math.PI*2+t*.5;
+        const x=Math.cos(theta)*radius*(.9+ring*.14),y=Math.sin(theta)*radius*.44;
+        ctx.beginPath();ctx.arc(x,y,j%4===0?2.5:1.2,0,Math.PI*2);ctx.fill();
+      }
+      ctx.restore();
+    }
+  } else if(mode==="wave") {
+    const w=state.viewportW*.61;
+    const amplitude=s*.055*(hand?1.3:1);
+    const bands=state.renderQuality==="performance"?4:7;
+    for(let k=0;k<bands;k++) {
+      ctx.globalAlpha=alpha*(.11+k*.062)*intensity;
+      ctx.lineWidth=k%3===0?1.8:.9;
+      ctx.beginPath();
+      for(let i=0;i<=55;i++){
+        const x=-w/2+(i/55)*w;
+        const y=(k-(bands-1)/2)*12+Math.sin((i/55)*Math.PI*4.5-t*1.5+k*.53)*amplitude;
+        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+  } else if(mode==="bloom") {
+    const petals=state.renderQuality==="performance"?8:12;
+    const base=s*.115+(state.motionReduced?0:Math.sin(t*1.4)*6);
+    for(let i=0;i<petals;i++) {
+      ctx.save();ctx.rotate(i*2*Math.PI/petals+t*.07);
+      ctx.globalAlpha=alpha*(.22+(i%3)*.065)*intensity;ctx.lineWidth=i%2===0?1.4:.8;
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.bezierCurveTo(base*.95,-base*.47,base*2,-base*.18,base*1.6,0);
+      ctx.bezierCurveTo(base*2,base*.18,base*.95,base*.47,0,0);ctx.stroke();
+      ctx.restore();
+    }
+  } else if(mode==="burst") {
+    const count=state.renderQuality==="performance"?18:34;
+    const phase=t*.25;
+    for(let i=0;i<count;i++){
+      const a=i*Math.PI*2/count+phase;
+      const r=s*(.20+(i%5)*.013);
+      ctx.globalAlpha=alpha*(.22+(i%4)*.11);
+      ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.65,Math.sin(a)*r*.65);
+      ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function renderVisualFX(ms) {
+  const prog=progressBetween(state.modeChangedAt, ms, 520);
+  if(prog<1 && state.previousVisualMode!==state.visualMode){
+    drawEffect(ms,state.previousVisualMode,1-prog);
+    drawEffect(ms,state.visualMode,prog);
+  } else drawEffect(ms,state.visualMode,1);
 }
 function draw(ms){
   if(!ctx)return;
   resizeCanvas();const {viewportW:w,viewportH:h}=state;
   ctx.clearRect(0,0,w,h);
   drawEnvironment(ms);
-  if(state.running && (state.faceLandmarks.length||state.handLandmarks.length))renderLandmarks(ms);
-  else if(!state.running)drawIdle(ms);
+  if(!state.running) drawIdle(ms);
+  renderVisualFX(ms);
+  if(state.running && (state.faceLandmarks.length||state.handLandmarks.length)) renderLandmarks(ms);
   drawBurst();
 }
 function tick(time){
-  // Video inference on main thread can be expensive; throttle to roughly 20Hz.
-  if(state.running && !document.hidden)infer(time);
-  const drawInterval=state.motionReduced?90:28;
-  if(time-state.lastDrawAt>=drawInterval){draw(time);state.lastDrawAt=time;}
+  // Video inference stays on the main thread in Phase 1; it is adaptively
+  // throttled. Workers are a separate tested Phase 2 migration.
+  if (!document.hidden) {
+    if (state.running) infer(time);
+    const drawInterval = state.motionReduced ? 95 : state.renderQuality === "performance" ? 45 : state.renderQuality === "cinematic" ? 20 : 29;
+    if (time - state.lastDrawAt >= drawInterval) { draw(time); state.lastDrawAt = time; }
+  }
   state.frameId=requestAnimationFrame(tick);
 }
 
 // UI and privacy lifecycle.
 dom.consent.addEventListener("change",()=>{dom.start.disabled=!dom.consent.checked || state.running || state.loading;if(!dom.consent.checked&&(state.running||state.loading))stopCamera("Camera stopped because consent was withdrawn.");});
 dom.start.addEventListener("click",startCamera);
+for(const button of dom.modeButtons) button.addEventListener("click", () => setManualMode(button.dataset.effect));
+dom.qualitySelect.addEventListener("change", () => {
+  state.quality = dom.qualitySelect.value;
+  state.renderQuality = resolvedQuality(state.quality, navigator.hardwareConcurrency, navigator.connection?.saveData === true);
+  resizeCanvas();
+  announce(`Rendering quality is now ${state.renderQuality}.`);
+});
 dom.stop.addEventListener("click",()=>stopCamera("Camera stopped. The session has ended."));
 dom.ghost.addEventListener("change",()=>dom.stage.classList.toggle("no-ghost",!dom.ghost.checked));
 dom.mesh.addEventListener("change",()=>{state.meshEnabled=dom.mesh.checked;});
@@ -422,6 +593,12 @@ dom.motion.addEventListener("change",()=>{state.motionReduced=dom.motion.checked
 if(prefersLessMotion) document.body.classList.add("reduce-motion");
 document.addEventListener("visibilitychange",()=>{if(document.hidden && (state.running||state.loading))stopCamera("Camera automatically stopped when the tab was hidden.");});
 window.addEventListener("pagehide",()=>stopCamera());
-window.addEventListener("resize",resizeCanvas,{passive:true});
-if(window.ResizeObserver){new ResizeObserver(resizeCanvas).observe(dom.stage);}
-resizeCanvas();requestAnimationFrame(tick);
+if (ctx) {
+  window.addEventListener("resize",resizeCanvas,{passive:true});
+  if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(dom.stage);
+  resizeCanvas();
+  requestAnimationFrame(tick);
+} else {
+  showError("NV. FACE LAB could not initialize its canvas. Try an updated browser.");
+  dom.start.disabled = true;
+}
